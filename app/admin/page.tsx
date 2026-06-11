@@ -17,7 +17,7 @@ import {
 } from "firebase/firestore";
 
 export default function AdminPage() {
-  const ADMIN_EMAIL = "mistrydev89@gmail.com"; // ⚠️ PUT YOUR EMAIL HERE
+  const ADMIN_EMAIL = "devmistry1230@gmail.com"; // ⚠️ PUT YOUR EMAIL HERE
 
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
