@@ -1,24 +1,69 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState, useEffect } from "react";
+import { auth, db } from "@/lib/firebase";
+import {
+  signInWithEmailAndPassword,
+  onAuthStateChanged,
+  User
+} from "firebase/auth";
+
 import {
   collection,
   addDoc,
   getDocs,
   deleteDoc,
-  doc,
+  doc
 } from "firebase/firestore";
-import { db } from "@/lib/firebase";
 
 export default function AdminPage() {
+  const ADMIN_EMAIL = "mistrydev89@gmail.com"; // ⚠️ PUT YOUR EMAIL HERE
+
+  const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
+
   const [restaurants, setRestaurants] = useState<any[]>([]);
 
-  // 🔥 Fetch data
+  // 🔐 AUTH CHECK
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (u) => {
+      if (u && u.email === ADMIN_EMAIL) {
+        setUser(u);
+      } else {
+        setUser(null);
+      }
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  // 🔐 LOGIN
+  const handleLogin = async () => {
+    try {
+      const res = await signInWithEmailAndPassword(auth, email, password);
+
+      if (res.user.email !== ADMIN_EMAIL) {
+        alert("❌ Not authorized");
+        return;
+      }
+
+      setUser(res.user);
+    } catch (err: any) {
+      alert(err.message);
+    }
+  };
+
+  // 📦 FETCH DATA
   const fetchRestaurants = async () => {
     const snapshot = await getDocs(collection(db, "restaurants"));
-    const data: any[] = snapshot.docs.map((doc) => ({
+    const data = snapshot.docs.map((doc) => ({
       id: doc.id,
       ...doc.data(),
     }));
@@ -26,20 +71,16 @@ export default function AdminPage() {
   };
 
   useEffect(() => {
-    fetchRestaurants();
-  }, []);
+    if (user) fetchRestaurants();
+  }, [user]);
 
-  // ➕ Add
-  const handleAdd = async () => {
-    if (!name || !slug) {
-      alert("Fill all fields");
-      return;
-    }
+  // ➕ ADD
+  const addRestaurant = async () => {
+    if (!name || !slug) return alert("Fill all fields");
 
     await addDoc(collection(db, "restaurants"), {
       name,
       slug,
-      createdAt: new Date(),
     });
 
     setName("");
@@ -47,146 +88,143 @@ export default function AdminPage() {
     fetchRestaurants();
   };
 
-  // 🗑 Delete
-  const handleDelete = async (id: string) => {
+  // ❌ DELETE
+  const deleteRestaurant = async (id: string) => {
     await deleteDoc(doc(db, "restaurants", id));
     fetchRestaurants();
   };
 
+  // ⏳ LOADING
+  if (loading) return <p style={{ color: "white" }}>Loading...</p>;
+
+  // 🔐 LOGIN UI
+  if (!user) {
+    return (
+      <div style={styles.container}>
+        <h2>🔐 Admin Login</h2>
+
+        <input
+          placeholder="Email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          style={styles.input}
+        />
+
+        <input
+          placeholder="Password"
+          type="password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          style={styles.input}
+        />
+
+        <button onClick={handleLogin} style={styles.button}>
+          Login
+        </button>
+      </div>
+    );
+  }
+
+  // ✅ ADMIN DASHBOARD
   return (
     <div style={styles.container}>
-      <h1 style={styles.title}>🔥 Admin Dashboard</h1>
+      <h1>🔥 Admin Dashboard</h1>
 
-      <div style={styles.grid}>
-        {/* ADD CARD */}
-        <div style={styles.card}>
-          <h2 style={styles.cardTitle}>Add Restaurant</h2>
+      <div style={styles.card}>
+        <h3>Add Restaurant</h3>
 
-          <input
-            placeholder="Restaurant Name"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            style={styles.input}
-          />
+        <input
+          placeholder="Restaurant Name"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          style={styles.input}
+        />
 
-          <input
-            placeholder="Slug (e.g. kscharchoal)"
-            value={slug}
-            onChange={(e) => setSlug(e.target.value)}
-            style={styles.input}
-          />
+        <input
+          placeholder="Slug"
+          value={slug}
+          onChange={(e) => setSlug(e.target.value)}
+          style={styles.input}
+        />
 
-          <button onClick={handleAdd} style={styles.addButton}>
-            Add Restaurant
-          </button>
-        </div>
+        <button onClick={addRestaurant} style={styles.addBtn}>
+          Add
+        </button>
+      </div>
 
-        {/* LIST CARD */}
-        <div style={styles.card}>
-          <h2 style={styles.cardTitle}>📋 Restaurants</h2>
+      <div style={styles.card}>
+        <h3>📋 Restaurants</h3>
 
-          {restaurants.length === 0 && (
-            <p style={{ opacity: 0.6 }}>No data yet</p>
-          )}
-
-          {restaurants.map((item) => (
-            <div key={item.id} style={styles.item}>
-              <div>
-                <h3 style={styles.itemTitle}>{item.name}</h3>
-                <p style={styles.itemSlug}>{item.slug}</p>
-              </div>
-
-              <button
-                onClick={() => handleDelete(item.id)}
-                style={styles.deleteButton}
-              >
-                Delete
-              </button>
+        {restaurants.map((r) => (
+          <div key={r.id} style={styles.row}>
+            <div>
+              <b>{r.name}</b>
+              <p style={{ opacity: 0.6 }}>{r.slug}</p>
             </div>
-          ))}
-        </div>
+
+            <button
+              onClick={() => deleteRestaurant(r.id)}
+              style={styles.deleteBtn}
+            >
+              Delete
+            </button>
+          </div>
+        ))}
       </div>
     </div>
   );
 }
 
+// 🎨 UI STYLES
 const styles: any = {
   container: {
     minHeight: "100vh",
     background: "#0f172a",
     color: "white",
-    padding: "40px",
-    fontFamily: "sans-serif",
+    padding: 40,
   },
-
-  title: {
-    fontSize: "28px",
-    marginBottom: "30px",
-  },
-
-  grid: {
-    display: "grid",
-    gridTemplateColumns: "1fr 2fr",
-    gap: "20px",
-  },
-
   card: {
     background: "#1e293b",
-    padding: "20px",
-    borderRadius: "12px",
-    boxShadow: "0 10px 30px rgba(0,0,0,0.3)",
+    padding: 20,
+    borderRadius: 10,
+    marginTop: 20,
   },
-
-  cardTitle: {
-    marginBottom: "15px",
-  },
-
   input: {
+    display: "block",
     width: "100%",
-    padding: "12px",
-    marginBottom: "10px",
-    borderRadius: "8px",
-    border: "1px solid #334155",
-    background: "#0f172a",
-    color: "white",
+    marginTop: 10,
+    padding: 10,
+    borderRadius: 6,
+    border: "none",
   },
-
-  addButton: {
-    width: "100%",
-    padding: "12px",
+  button: {
+    marginTop: 10,
+    padding: 10,
     background: "#22c55e",
     border: "none",
-    borderRadius: "8px",
-    color: "white",
-    fontWeight: "bold",
+    borderRadius: 6,
     cursor: "pointer",
   },
-
-  item: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    padding: "10px",
-    marginTop: "10px",
-    borderBottom: "1px solid #334155",
+  addBtn: {
+    marginTop: 10,
+    padding: 10,
+    background: "#22c55e",
+    border: "none",
+    borderRadius: 6,
+    cursor: "pointer",
   },
-
-  itemTitle: {
-    margin: 0,
-  },
-
-  itemSlug: {
-    margin: 0,
-    fontSize: "12px",
-    opacity: 0.7,
-  },
-
-  deleteButton: {
+  deleteBtn: {
     background: "#ef4444",
+    color: "white",
     border: "none",
     padding: "6px 12px",
-    borderRadius: "6px",
-    color: "white",
+    borderRadius: 6,
     cursor: "pointer",
+  },
+  row: {
+    display: "flex",
+    justifyContent: "space-between",
+    marginTop: 15,
+    alignItems: "center",
   },
 };

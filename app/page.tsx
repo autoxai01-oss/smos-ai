@@ -2,29 +2,26 @@ export default function Home() {
   return (
     <div style={{
       height: "100vh",
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
       background: "#0f172a",
       color: "white",
-      flexDirection: "column"
+      display: "flex",
+      flexDirection: "column",
+      alignItems: "center",
+      justifyContent: "center"
     }}>
       <h1>🚀 SMOS AI</h1>
-      <p>System is Live ✅</p>
+      <p>Smart Menu Ordering System</p>
 
-      <a
-        href="/admin"
-        style={{
-          marginTop: 20,
-          padding: "10px 20px",
-          background: "#22c55e",
-          borderRadius: 8,
-          textDecoration: "none",
-          color: "black",
-          fontWeight: "bold"
-        }}
-      >
-        Go to Admin Panel
+      <a href="/admin" style={{
+        marginTop: 20,
+        padding: "12px 24px",
+        background: "#22c55e",
+        borderRadius: 8,
+        textDecoration: "none",
+        color: "black",
+        fontWeight: "bold"
+      }}>
+        Admin Login 🔐
       </a>
     </div>
   );
