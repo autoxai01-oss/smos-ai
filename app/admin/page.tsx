@@ -1,66 +1,27 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { auth, db } from "@/lib/firebase";
-import {
-  signInWithEmailAndPassword,
-  onAuthStateChanged,
-  User
-} from "firebase/auth";
-
+import { useEffect, useState } from "react";
+import { db } from "@/lib/firebase";
 import {
   collection,
   addDoc,
   getDocs,
   deleteDoc,
-  doc
+  doc,
 } from "firebase/firestore";
 
 export default function AdminPage() {
-  const ADMIN_EMAIL = "devmistry1230@gmail.com"; // ⚠️ PUT YOUR EMAIL HERE
-
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-
+  // ------------------ RESTAURANTS ------------------
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
-
   const [restaurants, setRestaurants] = useState<any[]>([]);
 
-  // 🔐 AUTH CHECK
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (u) => {
-      if (u && u.email === ADMIN_EMAIL) {
-        setUser(u);
-      } else {
-        setUser(null);
-      }
-      setLoading(false);
-    });
+  // ------------------ MANAGERS ------------------
+  const [managerEmail, setManagerEmail] = useState("");
+  const [managerPassword, setManagerPassword] = useState("");
+  const [managerRestaurantId, setManagerRestaurantId] = useState("");
 
-    return () => unsubscribe();
-  }, []);
-
-  // 🔐 LOGIN
-  const handleLogin = async () => {
-    try {
-      const res = await signInWithEmailAndPassword(auth, email, password);
-
-      if (res.user.email !== ADMIN_EMAIL) {
-        alert("❌ Not authorized");
-        return;
-      }
-
-      setUser(res.user);
-    } catch (err: any) {
-      alert(err.message);
-    }
-  };
-
-  // 📦 FETCH DATA
+  // ------------------ FETCH RESTAURANTS ------------------
   const fetchRestaurants = async () => {
     const snapshot = await getDocs(collection(db, "restaurants"));
     const data = snapshot.docs.map((doc) => ({
@@ -71,160 +32,212 @@ export default function AdminPage() {
   };
 
   useEffect(() => {
-    if (user) fetchRestaurants();
-  }, [user]);
-
-  // ➕ ADD
-  const addRestaurant = async () => {
-    if (!name || !slug) return alert("Fill all fields");
-
-    await addDoc(collection(db, "restaurants"), {
-      name,
-      slug,
-    });
-
-    setName("");
-    setSlug("");
     fetchRestaurants();
+  }, []);
+
+  // ------------------ ADD RESTAURANT ------------------
+  const addRestaurant = async () => {
+    if (!name || !slug) {
+      alert("Fill all fields");
+      return;
+    }
+
+    try {
+      await addDoc(collection(db, "restaurants"), {
+        name,
+        slug,
+        createdAt: new Date(),
+      });
+
+      alert("Restaurant Added ✅");
+
+      setName("");
+      setSlug("");
+      fetchRestaurants();
+    } catch (err) {
+      console.error(err);
+      alert("Error adding restaurant");
+    }
   };
 
-  // ❌ DELETE
+  // ------------------ DELETE RESTAURANT ------------------
   const deleteRestaurant = async (id: string) => {
     await deleteDoc(doc(db, "restaurants", id));
     fetchRestaurants();
   };
 
-  // ⏳ LOADING
-  if (loading) return <p style={{ color: "white" }}>Loading...</p>;
+  // ------------------ ADD MANAGER ------------------
+  const addManager = async () => {
+    if (!managerEmail || !managerPassword || !managerRestaurantId) {
+      alert("Fill all fields");
+      return;
+    }
 
-  // 🔐 LOGIN UI
-  if (!user) {
-    return (
-      <div style={styles.container}>
-        <h2>🔐 Admin Login</h2>
+    try {
+      await addDoc(collection(db, "users"), {
+        email: managerEmail,
+        password: managerPassword,
+        role: "manager",
+        restaurantId: managerRestaurantId,
+        createdAt: new Date(),
+      });
 
-        <input
-          placeholder="Email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          style={styles.input}
-        />
+      alert("Manager Added ✅");
 
-        <input
-          placeholder="Password"
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          style={styles.input}
-        />
+      setManagerEmail("");
+      setManagerPassword("");
+      setManagerRestaurantId("");
+    } catch (err) {
+      console.error(err);
+      alert("Error adding manager");
+    }
+  };
 
-        <button onClick={handleLogin} style={styles.button}>
-          Login
-        </button>
-      </div>
-    );
-  }
-
-  // ✅ ADMIN DASHBOARD
+  // ------------------ UI ------------------
   return (
     <div style={styles.container}>
       <h1>🔥 Admin Dashboard</h1>
 
+      {/* ------------------ ADD RESTAURANT ------------------ */}
       <div style={styles.card}>
-        <h3>Add Restaurant</h3>
+        <h2>Add Restaurant</h2>
 
         <input
+          style={styles.input}
           placeholder="Restaurant Name"
           value={name}
           onChange={(e) => setName(e.target.value)}
-          style={styles.input}
         />
 
         <input
-          placeholder="Slug"
+          style={styles.input}
+          placeholder="Slug (e.g. kscharchoal)"
           value={slug}
           onChange={(e) => setSlug(e.target.value)}
-          style={styles.input}
         />
 
-        <button onClick={addRestaurant} style={styles.addBtn}>
-          Add
+        <button style={styles.button} onClick={addRestaurant}>
+          Add Restaurant
         </button>
       </div>
 
+      {/* ------------------ RESTAURANT LIST ------------------ */}
       <div style={styles.card}>
-        <h3>📋 Restaurants</h3>
+        <h2>📋 Restaurants</h2>
 
         {restaurants.map((r) => (
           <div key={r.id} style={styles.row}>
             <div>
               <b>{r.name}</b>
-              <p style={{ opacity: 0.6 }}>{r.slug}</p>
+              <p style={styles.slug}>{r.slug}</p>
+              <p style={styles.id}>ID: {r.id}</p>
             </div>
 
             <button
+              style={styles.delete}
               onClick={() => deleteRestaurant(r.id)}
-              style={styles.deleteBtn}
             >
               Delete
             </button>
           </div>
         ))}
       </div>
+
+      {/* ------------------ ADD MANAGER ------------------ */}
+      <div style={styles.card}>
+        <h2>👨‍💼 Add Manager</h2>
+
+        <input
+          style={styles.input}
+          placeholder="Manager Email"
+          value={managerEmail}
+          onChange={(e) => setManagerEmail(e.target.value)}
+        />
+
+        <input
+          style={styles.input}
+          type="password"
+          placeholder="Password"
+          value={managerPassword}
+          onChange={(e) => setManagerPassword(e.target.value)}
+        />
+
+        <input
+          style={styles.input}
+          placeholder="Restaurant ID (copy from above)"
+          value={managerRestaurantId}
+          onChange={(e) => setManagerRestaurantId(e.target.value)}
+        />
+
+        <button style={styles.button} onClick={addManager}>
+          Add Manager
+        </button>
+      </div>
     </div>
   );
 }
 
-// 🎨 UI STYLES
+// ------------------ STYLES ------------------
+
 const styles: any = {
   container: {
-    minHeight: "100vh",
+    padding: "40px",
     background: "#0f172a",
+    minHeight: "100vh",
     color: "white",
-    padding: 40,
   },
+
   card: {
     background: "#1e293b",
-    padding: 20,
-    borderRadius: 10,
-    marginTop: 20,
+    padding: "20px",
+    borderRadius: "10px",
+    marginTop: "20px",
   },
+
   input: {
     display: "block",
     width: "100%",
-    marginTop: 10,
-    padding: 10,
-    borderRadius: 6,
+    marginBottom: "10px",
+    padding: "10px",
+    borderRadius: "6px",
     border: "none",
   },
+
   button: {
-    marginTop: 10,
-    padding: 10,
     background: "#22c55e",
+    color: "black",
+    padding: "10px",
     border: "none",
-    borderRadius: 6,
+    borderRadius: "6px",
     cursor: "pointer",
   },
-  addBtn: {
-    marginTop: 10,
-    padding: 10,
-    background: "#22c55e",
-    border: "none",
-    borderRadius: 6,
-    cursor: "pointer",
-  },
-  deleteBtn: {
+
+  delete: {
     background: "#ef4444",
     color: "white",
+    padding: "8px",
     border: "none",
-    padding: "6px 12px",
-    borderRadius: 6,
+    borderRadius: "6px",
     cursor: "pointer",
   },
+
   row: {
     display: "flex",
     justifyContent: "space-between",
-    marginTop: 15,
     alignItems: "center",
+    background: "#334155",
+    padding: "10px",
+    marginTop: "10px",
+    borderRadius: "6px",
+  },
+
+  slug: {
+    fontSize: "12px",
+    opacity: 0.7,
+  },
+
+  id: {
+    fontSize: "11px",
+    color: "#94a3b8",
   },
 };
