@@ -2,94 +2,103 @@
 
 import { useEffect, useState } from "react";
 import { db } from "@/lib/firebase";
-import {
-  collection,
-  doc,
-  getDoc,
-  onSnapshot,
-} from "firebase/firestore";
+import { doc, getDoc, collection, getDocs } from "firebase/firestore";
 
-export default function MenuPage({ params }: any) {
+export default function MenuPage({ params }: { params: { id: string } }) {
   const [restaurant, setRestaurant] = useState<any>(null);
   const [items, setItems] = useState<any[]>([]);
   const [pin, setPin] = useState("");
-  const [access, setAccess] = useState(false);
+  const [verified, setVerified] = useState(false);
   const [loading, setLoading] = useState(true);
 
   // 🔥 LOAD RESTAURANT
   useEffect(() => {
+    if (!params?.id) return;
+
     const fetchRestaurant = async () => {
-      const ref = doc(db, "restaurants", params.id);
-      const snap = await getDoc(ref);
+      try {
+        console.log("Fetching:", params.id);
 
-      if (snap.exists()) {
-        setRestaurant(snap.data());
-      } else {
-        alert("Restaurant not found");
+        const ref = doc(db, "restaurants", params.id);
+        const snap = await getDoc(ref);
+
+        if (snap.exists()) {
+          console.log("Restaurant found:", snap.data());
+          setRestaurant(snap.data());
+        } else {
+          alert("Restaurant not found ❌");
+        }
+      } catch (err) {
+        console.error(err);
+        alert("Error loading restaurant ❌");
+      } finally {
+        setLoading(false); // ✅ IMPORTANT FIX
       }
-
-      setLoading(false);
     };
 
     fetchRestaurant();
-  }, []);
+  }, [params.id]);
 
-  // 🔐 CHECK PIN
-  const checkPin = () => {
+  // 🔥 LOAD MENU ITEMS
+  useEffect(() => {
+    if (!verified) return;
+
+    const fetchItems = async () => {
+      try {
+        const snap = await getDocs(
+          collection(db, "restaurants", params.id, "items")
+        );
+
+        const data: any[] = [];
+        snap.forEach((doc) =>
+          data.push({ id: doc.id, ...doc.data() })
+        );
+
+        setItems(data);
+      } catch (err) {
+        console.error(err);
+      }
+    };
+
+    fetchItems();
+  }, [verified, params.id]);
+
+  // 🔐 PIN CHECK
+  const handlePin = () => {
     if (!restaurant) {
-      alert("Restaurant not loaded yet");
+      alert("Restaurant not loaded ❌");
       return;
     }
 
-    console.log("Entered PIN:", pin);
-    console.log("Actual PIN:", restaurant.pin);
-
-    if (String(pin) === String(restaurant.pin)) {
-      setAccess(true);
+    if (pin === restaurant.pin) {
+      setVerified(true);
     } else {
       alert("Wrong PIN ❌");
     }
   };
 
-  // 🔴 REAL-TIME MENU
-  useEffect(() => {
-    if (!access) return;
-
-    const unsubscribe = onSnapshot(
-      collection(db, "restaurants", params.id, "menu"),
-      (snapshot) => {
-        const data = snapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        }));
-
-        setItems(data);
-      }
-    );
-
-    return () => unsubscribe();
-  }, [access]);
-
-  // ⏳ LOADING STATE
+  // 🔄 LOADING SCREEN
   if (loading) {
-    return <div style={styles.center}>Loading...</div>;
+    return (
+      <div style={styles.center}>
+        <h2>Loading...</h2>
+      </div>
+    );
   }
 
   // 🔐 PIN SCREEN
-  if (!access) {
+  if (!verified) {
     return (
       <div style={styles.center}>
         <div style={styles.card}>
           <h3>Enter Table PIN</h3>
-
           <input
             value={pin}
             onChange={(e) => setPin(e.target.value)}
             placeholder="Enter PIN"
             style={styles.input}
           />
-
-          <button onClick={checkPin} style={styles.button}>
+          <button onClick={handlePin} style={styles.button}>
             Enter
           </button>
         </div>
@@ -97,53 +106,60 @@ export default function MenuPage({ params }: any) {
     );
   }
 
-  // 🍽️ MENU SCREEN
+  // 🍽 MENU SCREEN
   return (
-    <div style={{ padding: 20, color: "white" }}>
-      <h2>{restaurant?.name} Menu</h2>
+    <div style={{ padding: 20 }}>
+      <h1>{restaurant?.name} Menu</h1>
 
-      {items.length === 0 && <p>No items yet</p>}
-
-      {items.map((item) => (
-        <div key={item.id} style={styles.item}>
-          <h3>{item.name}</h3>
-          <p>₹{item.price}</p>
-          <p>🔥 {item.calories || 0} kcal</p>
-          <p>💪 {item.protein || 0}g protein</p>
-        </div>
-      ))}
+      {items.length === 0 ? (
+        <p>No items found</p>
+      ) : (
+        items.map((item) => (
+          <div key={item.id} style={styles.item}>
+            <h3>{item.name}</h3>
+            <p>₹ {item.price}</p>
+          </div>
+        ))
+      )}
     </div>
   );
 }
 
-// 🎨 STYLES
+// 🎨 SIMPLE STYLES
 const styles: any = {
   center: {
     display: "flex",
     justifyContent: "center",
     alignItems: "center",
     height: "100vh",
+    background: "#0b1a2b",
+    color: "white",
   },
   card: {
-    background: "#111",
+    background: "#13263a",
     padding: 20,
     borderRadius: 10,
     textAlign: "center",
   },
   input: {
     padding: 10,
-    marginBottom: 10,
+    marginTop: 10,
     width: "100%",
+    borderRadius: 5,
   },
   button: {
+    marginTop: 10,
     padding: 10,
     background: "green",
     color: "white",
     border: "none",
+    borderRadius: 5,
   },
   item: {
-    border: "1px solid gray",
-    padding: 10,
-    marginBottom: 10,
+    background: "#13263a",
+    padding: 15,
+    marginTop: 10,
+    borderRadius: 8,
+    color: "white",
   },
 };
