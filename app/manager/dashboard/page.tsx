@@ -10,20 +10,25 @@ import {
   where,
   getDocs,
   deleteDoc,
-  doc
+  doc,
+  setDoc
 } from "firebase/firestore";
 import { useRouter } from "next/navigation";
 
 export default function ManagerDashboard() {
   const [restaurantId, setRestaurantId] = useState("");
   const [menu, setMenu] = useState<any[]>([]);
+
   const [name, setName] = useState("");
   const [price, setPrice] = useState("");
   const [category, setCategory] = useState("");
 
+  const [tableNumber, setTableNumber] = useState("");
+  const [generatedPin, setGeneratedPin] = useState("");
+
   const router = useRouter();
 
-  // 🔐 AUTH + ROLE CHECK
+  // 🔐 AUTH CHECK
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (user) => {
       if (!user) {
@@ -74,10 +79,10 @@ export default function ManagerDashboard() {
     setMenu(items);
   };
 
-  // ➕ ADD ITEM
+  // ➕ ADD MENU ITEM
   const addItem = async () => {
     if (!name || !price || !category) {
-      alert("Please fill all fields");
+      alert("Fill all fields");
       return;
     }
 
@@ -101,6 +106,31 @@ export default function ManagerDashboard() {
     fetchMenu(restaurantId);
   };
 
+  // 🔢 GENERATE RANDOM PIN
+  const generatePin = () => {
+    const pin = Math.floor(1000 + Math.random() * 9000).toString();
+    setGeneratedPin(pin);
+  };
+
+  // 💾 SAVE PIN (ONE DOC PER TABLE)
+  const savePin = async () => {
+    if (!tableNumber || !generatedPin) {
+      alert("Enter table and generate PIN");
+      return;
+    }
+
+    await setDoc(doc(db, "tablePins", tableNumber), {
+      restaurantId,
+      tableNumber,
+      pin: generatedPin,
+      updatedAt: new Date()
+    });
+
+    alert("PIN saved successfully!");
+    setTableNumber("");
+    setGeneratedPin("");
+  };
+
   return (
     <div className="min-h-screen bg-black text-white p-6">
 
@@ -108,7 +138,7 @@ export default function ManagerDashboard() {
         👨‍🍳 Manager Dashboard
       </h1>
 
-      {/* ADD ITEM */}
+      {/* ➕ ADD MENU */}
       <div className="bg-gray-900 p-4 rounded mb-6 flex flex-wrap gap-2">
 
         <input
@@ -127,7 +157,7 @@ export default function ManagerDashboard() {
 
         <input
           className="p-2 bg-gray-800 rounded"
-          placeholder="Category (e.g. Drinks)"
+          placeholder="Category (Drinks, Main Course)"
           value={category}
           onChange={(e) => setCategory(e.target.value)}
         />
@@ -138,10 +168,9 @@ export default function ManagerDashboard() {
         >
           Add
         </button>
-
       </div>
 
-      {/* MENU LIST */}
+      {/* 📋 MENU LIST */}
       <div className="bg-gray-900 p-4 rounded">
 
         <h2 className="text-xl mb-4">Menu Items</h2>
@@ -172,6 +201,40 @@ export default function ManagerDashboard() {
             </button>
           </div>
         ))}
+
+      </div>
+
+      {/* 🔐 TABLE PIN CONTROL */}
+      <div className="bg-gray-900 p-4 rounded mt-6">
+
+        <h2 className="text-xl mb-4">🔐 Table PIN Control</h2>
+
+        <input
+          className="p-2 bg-gray-800 mr-2"
+          placeholder="Table No (T1)"
+          value={tableNumber}
+          onChange={(e) => setTableNumber(e.target.value)}
+        />
+
+        <button
+          onClick={generatePin}
+          className="bg-yellow-500 px-4 py-2 mr-2 rounded"
+        >
+          Generate PIN
+        </button>
+
+        {generatedPin && (
+          <span className="mr-2 text-green-400">
+            PIN: {generatedPin}
+          </span>
+        )}
+
+        <button
+          onClick={savePin}
+          className="bg-blue-500 px-4 py-2 rounded"
+        >
+          Save PIN
+        </button>
 
       </div>
 
