@@ -1,123 +1,103 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { db } from "@/lib/firebase";
 import {
-  collection,
   addDoc,
-  getDocs,
+  collection,
   deleteDoc,
   doc,
+  onSnapshot,
 } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 
-export default function ManagerDashboard() {
-  const [user, setUser] = useState<any>(null);
-  const [items, setItems] = useState<any[]>([]);
+export default function Dashboard() {
   const [name, setName] = useState("");
   const [price, setPrice] = useState("");
+  const [items, setItems] = useState<any[]>([]);
 
-  // 🔥 LOAD USER
+  // 🔥 YOUR RESTAURANT ID
+  const restaurantId = "Fx59BXJH0zMJnqVSKZdS";
+
+  // ✅ LIVE FETCH (CORRECT PATH)
   useEffect(() => {
-    const data = JSON.parse(localStorage.getItem("manager") || "{}");
-    setUser(data);
-  }, []);
-
-  // 🔥 LOAD ITEMS
-  useEffect(() => {
-    if (!user?.restaurantId) return;
-
-    fetchItems();
-  }, [user]);
-
-  const fetchItems = async () => {
-    const snap = await getDocs(
-      collection(db, "restaurants", user.restaurantId, "items")
-    );
-
-    const data: any[] = [];
-    snap.forEach((doc) =>
-      data.push({ id: doc.id, ...doc.data() })
-    );
-
-    setItems(data);
-  };
-
-  // ➕ ADD ITEM
-  const addItem = async () => {
-    if (!name || !price) return;
-
-    await addDoc(
-      collection(db, "restaurants", user.restaurantId, "items"),
-      {
-        name,
-        price: Number(price),
+    const unsub = onSnapshot(
+      collection(db, "restaurants", restaurantId, "items"),
+      (snapshot) => {
+        const data = snapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        }));
+        setItems(data);
       }
     );
 
-    setName("");
-    setPrice("");
+    return () => unsub();
+  }, [restaurantId]);
 
-    fetchItems(); // refresh
+  // ✅ ADD ITEM (CORRECT COLLECTION)
+  const addItem = async () => {
+    if (!name || !price) {
+      alert("Enter item & price");
+      return;
+    }
+
+    try {
+      await addDoc(
+        collection(db, "restaurants", restaurantId, "items"),
+        {
+          name: name,
+          price: Number(price),
+          createdAt: new Date(),
+        }
+      );
+
+      setName("");
+      setPrice("");
+    } catch (err) {
+      console.error(err);
+      alert("Error adding item");
+    }
   };
 
-  // ❌ DELETE ITEM
+  // ✅ DELETE ITEM
   const deleteItem = async (id: string) => {
     await deleteDoc(
-      doc(db, "restaurants", user.restaurantId, "items", id)
+      doc(db, "restaurants", restaurantId, "items", id)
     );
-
-    fetchItems(); // refresh
   };
 
   return (
-    <div style={{ padding: 20 }}>
-      <h2>Manager Dashboard</h2>
+    <div style={{ padding: 30, color: "white" }}>
+      <h1>Manager Dashboard</h1>
 
-      <p>Email: {user?.email}</p>
-      <p>Restaurant ID: {user?.restaurantId}</p>
+      <h3>Add Item</h3>
 
-      {/* ADD ITEM */}
-      <div style={{ marginTop: 20 }}>
-        <h3>Add Menu Item</h3>
+      <input
+        placeholder="Item name"
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+      />
+      <br />
 
-        <input
-          placeholder="Item name"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-        />
+      <input
+        placeholder="Price"
+        value={price}
+        onChange={(e) => setPrice(e.target.value)}
+      />
+      <br />
 
-        <input
-          placeholder="Price"
-          value={price}
-          onChange={(e) => setPrice(e.target.value)}
-        />
+      <button onClick={addItem}>Add Item</button>
 
-        <button onClick={addItem}>Add Item</button>
-      </div>
+      <h3>Menu Items</h3>
 
-      {/* ITEMS LIST */}
-      <div style={{ marginTop: 30 }}>
-        <h3>Menu Items</h3>
-
-        {items.map((item) => (
-          <div
-            key={item.id}
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              marginTop: 10,
-            }}
-          >
-            <span>
-              {item.name} - ₹{item.price}
-            </span>
-
-            <button onClick={() => deleteItem(item.id)}>
-              Delete
-            </button>
-          </div>
-        ))}
-      </div>
+      {items.map((item) => (
+        <div key={item.id}>
+          {item.name} - ₹{item.price}
+          <button onClick={() => deleteItem(item.id)}>
+            Delete
+          </button>
+        </div>
+      ))}
     </div>
   );
 }

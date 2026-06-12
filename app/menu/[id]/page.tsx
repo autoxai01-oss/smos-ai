@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   collection,
   getDocs,
@@ -16,7 +16,7 @@ export default function MenuPage() {
   const [pin, setPin] = useState("");
   const [authorized, setAuthorized] = useState(false);
   const [items, setItems] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
 
   // ✅ CHECK PIN
   const checkPin = async () => {
@@ -24,7 +24,7 @@ export default function MenuPage() {
     const snap = await getDoc(ref);
 
     if (!snap.exists()) {
-      alert("Restaurant not found");
+      alert("Restaurant not found ❌");
       return;
     }
 
@@ -40,11 +40,13 @@ export default function MenuPage() {
 
   // ✅ LOAD MENU
   const loadMenu = async () => {
-    const querySnap = await getDocs(
+    setLoading(true);
+
+    const snapshot = await getDocs(
       collection(db, "restaurants", id as string, "items")
     );
 
-    const data = querySnap.docs.map((doc) => ({
+    const data = snapshot.docs.map((doc) => ({
       id: doc.id,
       ...doc.data(),
     }));
