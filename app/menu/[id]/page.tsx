@@ -1,160 +1,136 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { collection, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import {
-  collection,
-  getDocs,
-} from "firebase/firestore";
 
 export default function MenuPage({ params }: any) {
-  const restaurantId = params.id;
-
+  const [restaurant, setRestaurant] = useState<any>(null);
   const [pin, setPin] = useState("");
-  const [correctPin, setCorrectPin] = useState("");
-  const [verified, setVerified] = useState(false);
+  const [access, setAccess] = useState(false);
+  const [loading, setLoading] = useState(true);
 
-  const [items, setItems] = useState<any[]>([]);
-  const [cart, setCart] = useState<any[]>([]);
-
-  // 🔐 GET PIN FROM FIREBASE
+  // 🔥 FETCH RESTAURANT
   useEffect(() => {
     const fetchRestaurant = async () => {
       const snapshot = await getDocs(collection(db, "restaurants"));
 
+      let found: any = null;
+
       snapshot.forEach((doc) => {
         const data = doc.data();
 
-        if (data.restaurantId === restaurantId) {
-          setCorrectPin(data.pin);
+        console.log("Checking:", data); // DEBUG
+
+        if (data.restaurantId === params.id) {
+          found = data;
         }
       });
+
+      console.log("FOUND:", found); // DEBUG
+
+      if (!found) {
+        alert("Restaurant not found ❌");
+      } else {
+        setRestaurant(found);
+      }
+
+      setLoading(false);
     };
 
     fetchRestaurant();
-  }, []);
+  }, [params.id]);
 
-  // 🍽️ FETCH MENU
-  const fetchMenu = async () => {
-    const snapshot = await getDocs(collection(db, "menu"));
+  // 🔐 PIN CHECK
+  const handlePinSubmit = () => {
+    if (!restaurant) return;
 
-    let list: any[] = [];
-
-    snapshot.forEach((doc) => {
-      const data = doc.data();
-
-      if (data.restaurantId === restaurantId) {
-        list.push({ id: doc.id, ...data });
-      }
-    });
-
-    setItems(list);
-  };
-
-  // 🔐 VERIFY PIN
-  const verifyPin = () => {
-    if (pin === correctPin) {
-      setVerified(true);
-      fetchMenu();
+    if (pin === restaurant.pin) {
+      setAccess(true);
     } else {
-      alert("Wrong PIN");
+      alert("Wrong PIN ❌");
     }
   };
 
-  // 🛒 ADD TO CART
-  const addToCart = (item: any) => {
-    setCart([...cart, item]);
-  };
+  // ⏳ LOADING STATE
+  if (loading) {
+    return (
+      <div style={styles.center}>
+        <h2>Loading...</h2>
+      </div>
+    );
+  }
 
-  return (
-    <div style={styles.container}>
-      {!verified ? (
-        // 🔐 PIN SCREEN
+  // 🔐 PIN SCREEN
+  if (!access) {
+    return (
+      <div style={styles.center}>
         <div style={styles.card}>
           <h2>Enter Table PIN</h2>
 
           <input
+            type="text"
+            placeholder="Enter PIN"
             value={pin}
             onChange={(e) => setPin(e.target.value)}
-            placeholder="4-digit PIN"
             style={styles.input}
           />
 
-          <button onClick={verifyPin} style={styles.button}>
+          <button onClick={handlePinSubmit} style={styles.button}>
             Enter
           </button>
         </div>
-      ) : (
-        // 🍽️ MENU SCREEN
-        <div>
-          <h2>Menu</h2>
+      </div>
+    );
+  }
 
-          {items.map((item) => (
-            <div key={item.id} style={styles.item}>
-              <div>
-                <h3>{item.name}</h3>
-                <p>₹ {item.price}</p>
-              </div>
+  // 🍽 MENU UI (after PIN)
+  return (
+    <div style={styles.container}>
+      <h1>{restaurant?.name} Menu</h1>
 
-              <button
-                onClick={() => addToCart(item)}
-                style={styles.button}
-              >
-                Add
-              </button>
-            </div>
-          ))}
+      <p>Welcome! Menu will be shown here 👇</p>
 
-          <h3 style={{ marginTop: "20px" }}>🛒 Cart</h3>
-
-          {cart.map((c, i) => (
-            <div key={i}>
-              {c.name} - ₹{c.price}
-            </div>
-          ))}
-        </div>
-      )}
+      {/* NEXT STEP: fetch items from "menu" collection */}
     </div>
   );
 }
 
 const styles: any = {
-  container: {
-    minHeight: "100vh",
+  center: {
+    height: "100vh",
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center",
     background: "#0f172a",
     color: "white",
-    padding: "20px",
   },
   card: {
     background: "#1e293b",
-    padding: "20px",
+    padding: "30px",
     borderRadius: "10px",
-    maxWidth: "300px",
-    margin: "100px auto",
     textAlign: "center",
   },
   input: {
     padding: "10px",
-    width: "100%",
     marginTop: "10px",
-    borderRadius: "6px",
+    width: "200px",
+    borderRadius: "5px",
     border: "none",
   },
   button: {
-    marginTop: "10px",
-    padding: "10px",
-    background: "#22c55e",
-    border: "none",
-    borderRadius: "6px",
+    marginTop: "15px",
+    padding: "10px 20px",
+    background: "green",
     color: "white",
+    border: "none",
+    borderRadius: "5px",
     cursor: "pointer",
   },
-  item: {
-    background: "#334155",
-    padding: "15px",
-    marginTop: "10px",
-    borderRadius: "6px",
-    display: "flex",
-    justifyContent: "space-between",
+  container: {
+    padding: "30px",
+    background: "#0f172a",
+    color: "white",
+    minHeight: "100vh",
   },
 };
