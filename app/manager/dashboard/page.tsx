@@ -111,7 +111,10 @@ export default function ManagerDashboard() {
           onChange={(e) => setPrice(e.target.value)}
         />
 
-        <button onClick={addItem} className="bg-green-500 px-4 py-2 rounded">
+        <button
+          onClick={addItem}
+          className="bg-green-500 px-4 py-2 rounded"
+        >
           Add
         </button>
       </div>
