@@ -1,101 +1,88 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { db } from "@/firebase";
 import {
-  addDoc,
   collection,
+  addDoc,
+  getDocs,
   deleteDoc,
   doc,
-  onSnapshot,
 } from "firebase/firestore";
-import { db } from "@/lib/firebase";
 
 export default function Dashboard() {
+  const [items, setItems] = useState([]);
   const [name, setName] = useState("");
   const [price, setPrice] = useState("");
-  const [items, setItems] = useState<any[]>([]);
 
-  // 🔥 YOUR RESTAURANT ID
+  // 🔥 IMPORTANT: SAME restaurantId everywhere
   const restaurantId = "Fx59BXJH0zMJnqVSKZdS";
 
-  // ✅ LIVE FETCH (CORRECT PATH)
+  // LOAD ITEMS
+  const loadItems = async () => {
+    const snap = await getDocs(
+      collection(db, "restaurants", restaurantId, "items")
+    );
+
+    setItems(
+      snap.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }))
+    );
+  };
+
   useEffect(() => {
-    const unsub = onSnapshot(
+    loadItems();
+  }, []);
+
+  // ADD ITEM
+  const addItem = async () => {
+    if (!name || !price) return;
+
+    await addDoc(
       collection(db, "restaurants", restaurantId, "items"),
-      (snapshot) => {
-        const data = snapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        }));
-        setItems(data);
+      {
+        name,
+        price,
       }
     );
 
-    return () => unsub();
-  }, [restaurantId]);
-
-  // ✅ ADD ITEM (CORRECT COLLECTION)
-  const addItem = async () => {
-    if (!name || !price) {
-      alert("Enter item & price");
-      return;
-    }
-
-    try {
-      await addDoc(
-        collection(db, "restaurants", restaurantId, "items"),
-        {
-          name: name,
-          price: Number(price),
-          createdAt: new Date(),
-        }
-      );
-
-      setName("");
-      setPrice("");
-    } catch (err) {
-      console.error(err);
-      alert("Error adding item");
-    }
+    setName("");
+    setPrice("");
+    loadItems();
   };
 
-  // ✅ DELETE ITEM
-  const deleteItem = async (id: string) => {
+  // DELETE ITEM
+  const deleteItem = async (id) => {
     await deleteDoc(
       doc(db, "restaurants", restaurantId, "items", id)
     );
+    loadItems();
   };
 
   return (
-    <div style={{ padding: 30, color: "white" }}>
+    <div style={{ padding: 20 }}>
       <h1>Manager Dashboard</h1>
 
       <h3>Add Item</h3>
-
       <input
         placeholder="Item name"
         value={name}
         onChange={(e) => setName(e.target.value)}
       />
-      <br />
-
       <input
         placeholder="Price"
         value={price}
         onChange={(e) => setPrice(e.target.value)}
       />
-      <br />
-
-      <button onClick={addItem}>Add Item</button>
+      <button onClick={addItem}>Add</button>
 
       <h3>Menu Items</h3>
-
       {items.map((item) => (
         <div key={item.id}>
           {item.name} - ₹{item.price}
-          <button onClick={() => deleteItem(item.id)}>
-            Delete
-          </button>
+          <button onClick={() => deleteItem(item.id)}>Delete</button>
         </div>
       ))}
     </div>
