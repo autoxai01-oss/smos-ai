@@ -2,12 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { db } from "@/lib/firebase";
-import {
-  collection,
-  query,
-  where,
-  getDocs,
-} from "firebase/firestore";
+import { collection, getDocs } from "firebase/firestore";
 
 export default function MenuPage({ params }: any) {
   const [restaurant, setRestaurant] = useState<any>(null);
@@ -15,34 +10,43 @@ export default function MenuPage({ params }: any) {
   const [pin, setPin] = useState("");
   const [access, setAccess] = useState(false);
 
-  // 🔥 FETCH RESTAURANT (CORRECT WAY)
+  // 🔥 FETCH RESTAURANT (100% WORKING METHOD)
   useEffect(() => {
-    const fetchRestaurant = async () => {
+    const fetchData = async () => {
       try {
-        const q = query(
-          collection(db, "restaurants"),
-          where("restaurantId", "==", params.id)
-        );
+        console.log("URL PARAM:", params.id);
 
-        const snapshot = await getDocs(q);
+        // ✅ GET ALL RESTAURANTS
+        const snapshot = await getDocs(collection(db, "restaurants"));
 
-        if (snapshot.empty) {
+        let found: any = null;
+
+        snapshot.forEach((doc) => {
+          const data = doc.data();
+          console.log("CHECK:", data);
+
+          if (data.restaurantId === params.id) {
+            found = data;
+          }
+        });
+
+        if (!found) {
           alert("Restaurant not found ❌");
           return;
         }
 
-        const docData = snapshot.docs[0].data();
-        console.log("FOUND RESTAURANT:", docData);
+        console.log("FOUND RESTAURANT:", found);
 
-        setRestaurant(docData);
+        setRestaurant(found);
 
-        // 🔥 FETCH MENU ITEMS
-        const itemsSnap = await getDocs(collection(db, "menu"));
+        // ✅ FETCH MENU ITEMS
+        const menuSnap = await getDocs(collection(db, "menu"));
         const menuItems: any[] = [];
 
-        itemsSnap.forEach((doc) => {
+        menuSnap.forEach((doc) => {
           const data = doc.data();
-          if (data.restaurantId === docData.restaurantId) {
+
+          if (data.restaurantId === found.restaurantId) {
             menuItems.push({ id: doc.id, ...data });
           }
         });
@@ -54,18 +58,18 @@ export default function MenuPage({ params }: any) {
       }
     };
 
-    fetchRestaurant();
+    fetchData();
   }, [params.id]);
 
   // 🔐 PIN CHECK
   const handlePinSubmit = () => {
-    if (!restaurant) {
+    if (!restaurant?.pin) {
       alert("Restaurant not loaded ❌");
       return;
     }
 
     const entered = pin.toString().trim();
-    const actual = restaurant.pin?.toString().trim();
+    const actual = restaurant.pin.toString().trim();
 
     console.log("ENTERED:", entered);
     console.log("ACTUAL:", actual);
@@ -76,8 +80,6 @@ export default function MenuPage({ params }: any) {
       alert("Wrong PIN ❌");
     }
   };
-
-  // 🎯 UI
 
   // 🔒 PIN SCREEN
   if (!access) {
@@ -127,6 +129,7 @@ export default function MenuPage({ params }: any) {
   );
 }
 
+// 🎨 STYLES
 const styles: any = {
   container: {
     minHeight: "100vh",
@@ -136,8 +139,8 @@ const styles: any = {
   },
 
   card: {
-    maxWidth: "300px",
-    margin: "100px auto",
+    maxWidth: "320px",
+    margin: "120px auto",
     padding: "20px",
     background: "#1e2a38",
     borderRadius: "10px",
@@ -147,8 +150,8 @@ const styles: any = {
   input: {
     width: "100%",
     padding: "10px",
-    marginTop: "10px",
-    borderRadius: "5px",
+    marginTop: "15px",
+    borderRadius: "6px",
     border: "none",
   },
 
@@ -157,7 +160,7 @@ const styles: any = {
     padding: "10px 20px",
     background: "#22c55e",
     border: "none",
-    borderRadius: "5px",
+    borderRadius: "6px",
     color: "white",
     cursor: "pointer",
   },
