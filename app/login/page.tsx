@@ -2,66 +2,70 @@
 
 import { useState } from "react";
 import { signInWithEmailAndPassword } from "firebase/auth";
-import { auth } from "@/lib/firebase";
+import { auth, db } from "@/lib/firebase";
+import { useRouter } from "next/navigation";
+import { collection, query, where, getDocs } from "firebase/firestore";
 
-export default function LoginPage() {
+export default function ManagerLogin() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const router = useRouter();
 
   const handleLogin = async () => {
     try {
-      await signInWithEmailAndPassword(auth, email, password);
-      
-      alert("Login successful 🚀");
+      const userCred = await signInWithEmailAndPassword(auth, email, password);
 
-      // 👉 redirect to admin
-      window.location.href = "/admin";
+      const q = query(
+        collection(db, "users"),
+        where("email", "==", userCred.user.email)
+      );
+
+      const snap = await getDocs(q);
+
+      if (snap.empty) {
+        alert("No account found");
+        return;
+      }
+
+      const data = snap.docs[0].data();
+
+      if (data.role !== "manager") {
+        alert("Access denied");
+        return;
+      }
+
+      router.push("/manager/dashboard");
 
     } catch (error: any) {
-      console.log(error);
-      alert(error.message); // 🔥 SHOW REAL ERROR
+      alert(error.message);
     }
   };
 
   return (
-    <div style={{ padding: 40 }}>
-      <h1>🔐 Admin Login</h1>
+    <div className="min-h-screen flex items-center justify-center bg-black text-white">
+      <div className="bg-gray-900 p-6 rounded-xl w-80">
+        <h1 className="text-xl mb-4">Manager Login</h1>
 
-      <input
-        type="email"
-        placeholder="Enter email"
-        value={email}
-        onChange={(e) => setEmail(e.target.value)}
-        style={{
-          display: "block",
-          marginBottom: 10,
-          padding: 10,
-          width: 250,
-        }}
-      />
+        <input
+          className="w-full mb-3 p-2 bg-gray-800 rounded"
+          placeholder="Email"
+          onChange={(e) => setEmail(e.target.value)}
+        />
 
-      <input
-        type="password"
-        placeholder="Enter password"
-        value={password}
-        onChange={(e) => setPassword(e.target.value)}
-        style={{
-          display: "block",
-          marginBottom: 10,
-          padding: 10,
-          width: 250,
-        }}
-      />
+        <input
+          type="password"
+          className="w-full mb-3 p-2 bg-gray-800 rounded"
+          placeholder="Password"
+          onChange={(e) => setPassword(e.target.value)}
+        />
 
-      <button
-        onClick={handleLogin}
-        style={{
-          padding: "10px 20px",
-          cursor: "pointer",
-        }}
-      >
-        Login
-      </button>
+        <button
+          onClick={handleLogin}
+          className="w-full bg-green-500 p-2 rounded"
+        >
+          Login
+        </button>
+      </div>
     </div>
   );
 }
