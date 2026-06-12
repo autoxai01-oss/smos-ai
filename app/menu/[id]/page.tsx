@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { db } from "@/lib/firebase";
-import { collection, getDocs } from "firebase/firestore";
+import { doc, getDoc, collection, getDocs } from "firebase/firestore";
 
 export default function MenuPage({ params }: any) {
   const [restaurant, setRestaurant] = useState<any>(null);
@@ -11,47 +11,35 @@ export default function MenuPage({ params }: any) {
   const [access, setAccess] = useState(false);
 
   useEffect(() => {
-    if (!params?.id) return; // ✅ WAIT until ID exists
+    if (!params?.id) return;
 
     const fetchData = async () => {
       try {
-        console.log("PARAM ID:", params.id);
+        console.log("DOC ID:", params.id);
 
-        const snapshot = await getDocs(collection(db, "restaurants"));
+        // ✅ GET RESTAURANT BY DOC ID (MOST RELIABLE)
+        const ref = doc(db, "restaurants", params.id);
+        const snap = await getDoc(ref);
 
-        let found: any = null;
-
-        snapshot.forEach((doc) => {
-          const data = doc.data();
-
-          console.log("CHECKING:", data.restaurantId);
-
-          if (String(data.restaurantId) === String(params.id)) {
-            found = {
-              id: doc.id,
-              ...data,
-            };
-          }
-        });
-
-        if (!found) {
-          alert("Restaurant NOT FOUND ❌");
+        if (!snap.exists()) {
+          alert("Restaurant not found ❌");
           return;
         }
 
-        console.log("FOUND:", found);
+        const data = snap.data();
+        console.log("FOUND:", data);
 
-        setRestaurant(found);
+        setRestaurant({ id: snap.id, ...data });
 
-        // ✅ FETCH MENU
+        // ✅ FETCH MENU ITEMS
         const menuSnap = await getDocs(collection(db, "menu"));
         const menuItems: any[] = [];
 
         menuSnap.forEach((doc) => {
-          const data = doc.data();
+          const item = doc.data();
 
-          if (String(data.restaurantId) === String(found.restaurantId)) {
-            menuItems.push({ id: doc.id, ...data });
+          if (item.restaurantId === data.restaurantId) {
+            menuItems.push({ id: doc.id, ...item });
           }
         });
 
@@ -72,13 +60,7 @@ export default function MenuPage({ params }: any) {
       return;
     }
 
-    const entered = pin.trim();
-    const actual = String(restaurant.pin).trim();
-
-    console.log("ENTERED:", entered);
-    console.log("ACTUAL:", actual);
-
-    if (entered === actual) {
+    if (pin.trim() === String(restaurant.pin).trim()) {
       setAccess(true);
     } else {
       alert("Wrong PIN ❌");
@@ -94,9 +76,9 @@ export default function MenuPage({ params }: any) {
 
           <input
             type="text"
-            placeholder="Enter PIN"
             value={pin}
             onChange={(e) => setPin(e.target.value)}
+            placeholder="Enter PIN"
             style={styles.input}
           />
 
@@ -111,17 +93,15 @@ export default function MenuPage({ params }: any) {
   // 🍽 MENU
   return (
     <div style={styles.container}>
-      <h1>{restaurant?.name}</h1>
+      <h1>{restaurant.name}</h1>
 
       {items.length === 0 ? (
         <p>No items</p>
       ) : (
         items.map((item) => (
           <div key={item.id} style={styles.item}>
-            <div>
-              <h3>{item.name}</h3>
-              <p>₹{item.price}</p>
-            </div>
+            <h3>{item.name}</h3>
+            <p>₹{item.price}</p>
           </div>
         ))
       )}
@@ -153,12 +133,11 @@ const styles: any = {
   },
   button: {
     marginTop: "15px",
-    padding: "10px 20px",
+    padding: "10px",
     background: "#22c55e",
     border: "none",
     borderRadius: "5px",
     color: "white",
-    cursor: "pointer",
   },
   item: {
     background: "#1e2a38",
