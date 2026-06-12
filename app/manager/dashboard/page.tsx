@@ -1,60 +1,123 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 import { db } from "@/lib/firebase";
-import { collection, getDocs } from "firebase/firestore";
+import {
+  collection,
+  addDoc,
+  getDocs,
+  deleteDoc,
+  doc,
+  onSnapshot,
+} from "firebase/firestore";
 
-export default function ManagerLogin() {
-  const router = useRouter();
+export default function ManagerDashboard() {
+  const [items, setItems] = useState<any[]>([]);
+  const [name, setName] = useState("");
+  const [price, setPrice] = useState("");
+  const [calories, setCalories] = useState("");
+  const [protein, setProtein] = useState("");
 
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const restaurant = JSON.parse(localStorage.getItem("manager") || "{}");
 
-  const handleLogin = async () => {
-    const snapshot = await getDocs(collection(db, "users"));
+  // 🔥 REAL-TIME LISTENER
+  useEffect(() => {
+    if (!restaurant?.restaurantId) return;
 
-    let foundUser: any = null;
-
-    snapshot.forEach((doc) => {
-      const data = doc.data();
-
-      if (
-        data.email === email &&
-        data.password === password &&
-        data.role === "manager"
-      ) {
-        foundUser = data;
+    const unsubscribe = onSnapshot(
+      collection(db, "restaurants", restaurant.restaurantId, "menu"),
+      (snapshot) => {
+        const data = snapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        }));
+        setItems(data);
       }
-    });
+    );
 
-    if (!foundUser) {
-      alert("❌ Invalid credentials");
+    return () => unsubscribe();
+  }, []);
+
+  // ➕ ADD ITEM
+  const addItem = async () => {
+    if (!name || !price) {
+      alert("Enter name & price");
       return;
     }
 
-    localStorage.setItem("manager", JSON.stringify(foundUser));
-    router.push("/manager/dashboard");
+    await addDoc(
+      collection(db, "restaurants", restaurant.restaurantId, "menu"),
+      {
+        name,
+        price: Number(price),
+        calories: Number(calories || 0),
+        protein: Number(protein || 0),
+        createdAt: new Date(),
+      }
+    );
+
+    setName("");
+    setPrice("");
+    setCalories("");
+    setProtein("");
+  };
+
+  // ❌ DELETE ITEM
+  const deleteItem = async (id: string) => {
+    await deleteDoc(
+      doc(db, "restaurants", restaurant.restaurantId, "menu", id)
+    );
   };
 
   return (
-    <div style={{ padding: "40px", color: "white" }}>
-      <h1>🔐 Manager Login</h1>
+    <div style={{ padding: 20, color: "white" }}>
+      <h2>Manager Dashboard</h2>
 
-      <input
-        placeholder="Email"
-        onChange={(e) => setEmail(e.target.value)}
-      />
-      <br /><br />
+      {/* ADD FORM */}
+      <div style={{ marginBottom: 20 }}>
+        <input
+          placeholder="Item Name"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+        />
+        <input
+          placeholder="Price"
+          value={price}
+          onChange={(e) => setPrice(e.target.value)}
+        />
+        <input
+          placeholder="Calories"
+          value={calories}
+          onChange={(e) => setCalories(e.target.value)}
+        />
+        <input
+          placeholder="Protein"
+          value={protein}
+          onChange={(e) => setProtein(e.target.value)}
+        />
 
-      <input
-        type="password"
-        placeholder="Password"
-        onChange={(e) => setPassword(e.target.value)}
-      />
-      <br /><br />
+        <button onClick={addItem}>Add Item</button>
+      </div>
 
-      <button onClick={handleLogin}>Login</button>
+      {/* ITEMS LIST */}
+      <div>
+        {items.map((item) => (
+          <div
+            key={item.id}
+            style={{
+              marginBottom: 10,
+              padding: 10,
+              border: "1px solid gray",
+            }}
+          >
+            <b>{item.name}</b> - ₹{item.price}  
+            <br />
+            🔥 {item.calories} kcal | 💪 {item.protein}g
+            <br />
+            <button onClick={() => deleteItem(item.id)}>Delete</button>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
