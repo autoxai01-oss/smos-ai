@@ -14,6 +14,7 @@ export default function MenuPage({ params }: any) {
   const [items, setItems] = useState<any[]>([]);
   const [pin, setPin] = useState("");
   const [access, setAccess] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   // 🔥 LOAD RESTAURANT
   useEffect(() => {
@@ -26,23 +27,31 @@ export default function MenuPage({ params }: any) {
       } else {
         alert("Restaurant not found");
       }
+
+      setLoading(false);
     };
 
     fetchRestaurant();
   }, []);
 
-  // 🔐 PIN CHECK
+  // 🔐 CHECK PIN
   const checkPin = () => {
-    if (!restaurant) return;
+    if (!restaurant) {
+      alert("Restaurant not loaded yet");
+      return;
+    }
 
-    if (pin === restaurant.pin) {
+    console.log("Entered PIN:", pin);
+    console.log("Actual PIN:", restaurant.pin);
+
+    if (String(pin) === String(restaurant.pin)) {
       setAccess(true);
     } else {
-      alert("Wrong PIN");
+      alert("Wrong PIN ❌");
     }
   };
 
-  // 📦 LOAD MENU REAL-TIME
+  // 🔴 REAL-TIME MENU
   useEffect(() => {
     if (!access) return;
 
@@ -53,6 +62,7 @@ export default function MenuPage({ params }: any) {
           id: doc.id,
           ...doc.data(),
         }));
+
         setItems(data);
       }
     );
@@ -60,19 +70,28 @@ export default function MenuPage({ params }: any) {
     return () => unsubscribe();
   }, [access]);
 
+  // ⏳ LOADING STATE
+  if (loading) {
+    return <div style={styles.center}>Loading...</div>;
+  }
+
   // 🔐 PIN SCREEN
   if (!access) {
     return (
       <div style={styles.center}>
         <div style={styles.card}>
           <h3>Enter Table PIN</h3>
+
           <input
             value={pin}
             onChange={(e) => setPin(e.target.value)}
-            placeholder="4-digit PIN"
+            placeholder="Enter PIN"
+            style={styles.input}
           />
-          <br />
-          <button onClick={checkPin}>Enter</button>
+
+          <button onClick={checkPin} style={styles.button}>
+            Enter
+          </button>
         </div>
       </div>
     );
@@ -89,14 +108,15 @@ export default function MenuPage({ params }: any) {
         <div key={item.id} style={styles.item}>
           <h3>{item.name}</h3>
           <p>₹{item.price}</p>
-          <p>🔥 {item.calories} kcal</p>
-          <p>💪 {item.protein}g protein</p>
+          <p>🔥 {item.calories || 0} kcal</p>
+          <p>💪 {item.protein || 0}g protein</p>
         </div>
       ))}
     </div>
   );
 }
 
+// 🎨 STYLES
 const styles: any = {
   center: {
     display: "flex",
@@ -108,6 +128,18 @@ const styles: any = {
     background: "#111",
     padding: 20,
     borderRadius: 10,
+    textAlign: "center",
+  },
+  input: {
+    padding: 10,
+    marginBottom: 10,
+    width: "100%",
+  },
+  button: {
+    padding: 10,
+    background: "green",
+    color: "white",
+    border: "none",
   },
   item: {
     border: "1px solid gray",
