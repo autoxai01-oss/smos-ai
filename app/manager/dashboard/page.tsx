@@ -23,10 +23,10 @@ export default function ManagerDashboard() {
   const [price, setPrice] = useState("");
   const [category, setCategory] = useState("");
 
-  const [tableNumber, setTableNumber] = useState("");
-  const [generatedPin, setGeneratedPin] = useState("");
-
   const router = useRouter();
+
+  // 🔢 FIXED TABLE LIST
+  const tables = ["T1","T2","T3","T4","T5","T6","T7","T8","T9","T10"];
 
   // 🔐 AUTH CHECK
   useEffect(() => {
@@ -106,31 +106,6 @@ export default function ManagerDashboard() {
     fetchMenu(restaurantId);
   };
 
-  // 🔢 GENERATE RANDOM PIN
-  const generatePin = () => {
-    const pin = Math.floor(1000 + Math.random() * 9000).toString();
-    setGeneratedPin(pin);
-  };
-
-  // 💾 SAVE PIN (ONE DOC PER TABLE)
-  const savePin = async () => {
-    if (!tableNumber || !generatedPin) {
-      alert("Enter table and generate PIN");
-      return;
-    }
-
-    await setDoc(doc(db, "tablePins", tableNumber), {
-      restaurantId,
-      tableNumber,
-      pin: generatedPin,
-      updatedAt: new Date()
-    });
-
-    alert("PIN saved successfully!");
-    setTableNumber("");
-    setGeneratedPin("");
-  };
-
   return (
     <div className="min-h-screen bg-black text-white p-6">
 
@@ -204,37 +179,39 @@ export default function ManagerDashboard() {
 
       </div>
 
-      {/* 🔐 TABLE PIN CONTROL */}
+      {/* 🔐 TABLE PIN SYSTEM (FIXED TABLES) */}
       <div className="bg-gray-900 p-4 rounded mt-6">
 
         <h2 className="text-xl mb-4">🔐 Table PIN Control</h2>
 
-        <input
-          className="p-2 bg-gray-800 mr-2"
-          placeholder="Table No (T1)"
-          value={tableNumber}
-          onChange={(e) => setTableNumber(e.target.value)}
-        />
+        {tables.map((table) => (
+          <div
+            key={table}
+            className="flex justify-between items-center bg-gray-800 p-3 mb-2 rounded"
+          >
+            
+            <span className="font-semibold">{table}</span>
 
-        <button
-          onClick={generatePin}
-          className="bg-yellow-500 px-4 py-2 mr-2 rounded"
-        >
-          Generate PIN
-        </button>
+            <button
+              onClick={async () => {
+                const pin = Math.floor(1000 + Math.random() * 9000).toString();
 
-        {generatedPin && (
-          <span className="mr-2 text-green-400">
-            PIN: {generatedPin}
-          </span>
-        )}
+                await setDoc(doc(db, "tablePins", restaurantId + "_" + table), {
+                  restaurantId,
+                  tableNumber: table,
+                  pin,
+                  updatedAt: new Date()
+                });
 
-        <button
-          onClick={savePin}
-          className="bg-blue-500 px-4 py-2 rounded"
-        >
-          Save PIN
-        </button>
+                alert(`${table} PIN: ${pin}`);
+              }}
+              className="bg-yellow-500 px-4 py-1 rounded"
+            >
+              Generate PIN
+            </button>
+
+          </div>
+        ))}
 
       </div>
 
