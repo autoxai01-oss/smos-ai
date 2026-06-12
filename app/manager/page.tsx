@@ -1,52 +1,197 @@
 "use client";
 
-import { useState } from "react";
-import { collection, getDocs } from "firebase/firestore";
+import { useEffect, useState } from "react";
 import { db } from "@/lib/firebase";
+import {
+  collection,
+  addDoc,
+  getDocs,
+  deleteDoc,
+  doc,
+} from "firebase/firestore";
 
-export default function ManagerLogin() {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+export default function ManagerDashboard() {
+  const [user, setUser] = useState<any>(null);
+  const [items, setItems] = useState<any[]>([]);
 
-  const handleLogin = async () => {
-    const snapshot = await getDocs(collection(db, "users"));
+  const [name, setName] = useState("");
+  const [price, setPrice] = useState("");
 
-    const user = snapshot.docs.find(
-      (doc) =>
-        doc.data().email === email &&
-        doc.data().password === password
+  // ------------------ LOAD USER ------------------
+  useEffect(() => {
+    const data = JSON.parse(localStorage.getItem("manager") || "{}");
+    setUser(data);
+
+    if (data?.restaurantId) {
+      fetchItems(data.restaurantId);
+    }
+  }, []);
+
+  // ------------------ FETCH MENU ------------------
+  const fetchItems = async (restaurantId: string) => {
+    const snapshot = await getDocs(
+      collection(db, "restaurants", restaurantId, "menu")
     );
 
-    if (!user) {
-      alert("Invalid credentials");
-      return;
-    }
+    const data = snapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+    }));
 
-    if (user.data().role !== "manager") {
-      alert("Access denied");
-      return;
-    }
-
-    localStorage.setItem("manager", JSON.stringify(user.data()));
-
-    window.location.href = "/manager/dashboard";
+    setItems(data);
   };
 
+  // ------------------ ADD ITEM ------------------
+  const addItem = async () => {
+    if (!name || !price) {
+      alert("Fill all fields");
+      return;
+    }
+
+    try {
+      await addDoc(
+        collection(db, "restaurants", user.restaurantId, "menu"),
+        {
+          name,
+          price,
+          createdAt: new Date(),
+        }
+      );
+
+      alert("Item Added ✅");
+
+      setName("");
+      setPrice("");
+      fetchItems(user.restaurantId);
+    } catch (err) {
+      console.error(err);
+      alert("Error adding item");
+    }
+  };
+
+  // ------------------ DELETE ITEM ------------------
+  const deleteItem = async (id: string) => {
+    await deleteDoc(
+      doc(db, "restaurants", user.restaurantId, "menu", id)
+    );
+
+    fetchItems(user.restaurantId);
+  };
+
+  if (!user) return <p>Loading...</p>;
+
   return (
-    <div style={{ padding: 40 }}>
-      <h2>Manager Login</h2>
+    <div style={styles.container}>
+      <h1>🍽 Manager Dashboard</h1>
 
-      <input placeholder="Email" onChange={(e) => setEmail(e.target.value)} />
-      <br />
+      <p><b>Email:</b> {user.email}</p>
+      <p><b>Restaurant ID:</b> {user.restaurantId}</p>
 
-      <input
-        placeholder="Password"
-        type="password"
-        onChange={(e) => setPassword(e.target.value)}
-      />
-      <br />
+      {/* ------------------ ADD ITEM ------------------ */}
+      <div style={styles.card}>
+        <h2>Add Menu Item</h2>
 
-      <button onClick={handleLogin}>Login</button>
+        <input
+          style={styles.input}
+          placeholder="Item Name"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+        />
+
+        <input
+          style={styles.input}
+          placeholder="Price"
+          value={price}
+          onChange={(e) => setPrice(e.target.value)}
+        />
+
+        <button style={styles.button} onClick={addItem}>
+          Add Item
+        </button>
+      </div>
+
+      {/* ------------------ MENU LIST ------------------ */}
+      <div style={styles.card}>
+        <h2>📋 Menu Items</h2>
+
+        {items.length === 0 && <p>No items yet</p>}
+
+        {items.map((item) => (
+          <div key={item.id} style={styles.row}>
+            <div>
+              <b>{item.name}</b>
+              <p style={styles.price}>₹ {item.price}</p>
+            </div>
+
+            <button
+              style={styles.delete}
+              onClick={() => deleteItem(item.id)}
+            >
+              Delete
+            </button>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
+
+// ------------------ STYLES ------------------
+
+const styles: any = {
+  container: {
+    padding: "40px",
+    background: "#0f172a",
+    minHeight: "100vh",
+    color: "white",
+  },
+
+  card: {
+    background: "#1e293b",
+    padding: "20px",
+    borderRadius: "10px",
+    marginTop: "20px",
+  },
+
+  input: {
+    display: "block",
+    width: "100%",
+    marginBottom: "10px",
+    padding: "10px",
+    borderRadius: "6px",
+    border: "none",
+  },
+
+  button: {
+    background: "#22c55e",
+    color: "black",
+    padding: "10px",
+    border: "none",
+    borderRadius: "6px",
+    cursor: "pointer",
+  },
+
+  delete: {
+    background: "#ef4444",
+    color: "white",
+    padding: "8px",
+    border: "none",
+    borderRadius: "6px",
+    cursor: "pointer",
+  },
+
+  row: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    background: "#334155",
+    padding: "10px",
+    marginTop: "10px",
+    borderRadius: "6px",
+  },
+
+  price: {
+    fontSize: "12px",
+    color: "#94a3b8",
+  },
+};
