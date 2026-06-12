@@ -1,85 +1,149 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { db } from "@/lib/firebase";
-import { collection, getDocs } from "firebase/firestore";
+import {
+  collection,
+  addDoc,
+  getDocs,
+  deleteDoc,
+  doc,
+} from "firebase/firestore";
 
-export default function ManagerLogin() {
+export default function ManagerDashboard() {
   const router = useRouter();
 
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [user, setUser] = useState<any>(null);
+  const [items, setItems] = useState<any[]>([]);
 
-  const handleLogin = async () => {
-    if (!email || !password) {
-      alert("Please enter email & password");
+  const [name, setName] = useState("");
+  const [price, setPrice] = useState("");
+
+  // ✅ AUTH CHECK + LOAD DATA
+  useEffect(() => {
+    const data = JSON.parse(localStorage.getItem("manager") || "null");
+
+    if (!data) {
+      router.push("/manager"); // redirect if not logged in
       return;
     }
 
-    setLoading(true);
+    setUser(data);
 
-    try {
-      const snapshot = await getDocs(collection(db, "users"));
+    if (data.restaurantId) {
+      fetchItems(data.restaurantId);
+    }
+  }, []);
 
-      let foundUser: any = null;
+  // ✅ FETCH MENU ITEMS
+  const fetchItems = async (restaurantId: string) => {
+    const snapshot = await getDocs(collection(db, "menu"));
 
-      snapshot.forEach((doc) => {
-        const data = doc.data();
+    let list: any[] = [];
 
-        if (
-          data.email === email &&
-          data.password === password &&
-          data.role === "manager"
-        ) {
-          foundUser = data;
-        }
-      });
+    snapshot.forEach((doc) => {
+      const data = doc.data();
 
-      if (foundUser) {
-        console.log("LOGIN SUCCESS:", foundUser);
-
-        // Save login session
-        localStorage.setItem("manager", JSON.stringify(foundUser));
-
-        // Redirect to dashboard
-        router.push("/manager/dashboard");
-      } else {
-        alert("Invalid email or password");
+      if (data.restaurantId === restaurantId) {
+        list.push({ id: doc.id, ...data });
       }
-    } catch (error) {
-      console.error("Login error:", error);
-      alert("Something went wrong");
+    });
+
+    setItems(list);
+  };
+
+  // ✅ ADD ITEM
+  const addItem = async () => {
+    if (!name || !price) {
+      alert("Enter name & price");
+      return;
     }
 
-    setLoading(false);
+    await addDoc(collection(db, "menu"), {
+      name,
+      price,
+      restaurantId: user.restaurantId,
+    });
+
+    setName("");
+    setPrice("");
+
+    fetchItems(user.restaurantId);
   };
+
+  // ✅ DELETE ITEM
+  const deleteItem = async (id: string) => {
+    await deleteDoc(doc(db, "menu", id));
+    fetchItems(user.restaurantId);
+  };
+
+  // ✅ LOGOUT
+  const logout = () => {
+    localStorage.removeItem("manager");
+    router.push("/manager");
+  };
+
+  if (!user) return null;
 
   return (
     <div style={styles.container}>
-      <h2 style={styles.title}>🔐 Manager Login</h2>
+      <div style={styles.header}>
+        <div>
+          <h2>🍽️ Manager Dashboard</h2>
+          <p>Email: {user.email}</p>
+          <p>Restaurant ID: {user.restaurantId}</p>
+        </div>
 
-      <div style={styles.card}>
-        <input
-          type="email"
-          placeholder="Enter email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          style={styles.input}
-        />
-
-        <input
-          type="password"
-          placeholder="Enter password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          style={styles.input}
-        />
-
-        <button onClick={handleLogin} style={styles.button}>
-          {loading ? "Logging in..." : "Login"}
+        <button onClick={logout} style={styles.logout}>
+          Logout
         </button>
+      </div>
+
+      {/* ADD ITEM */}
+      <div style={styles.card}>
+        <h3>Add Menu Item</h3>
+
+        <input
+          placeholder="Item name"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          style={styles.input}
+        />
+
+        <input
+          placeholder="Price"
+          value={price}
+          onChange={(e) => setPrice(e.target.value)}
+          style={styles.input}
+        />
+
+        <button onClick={addItem} style={styles.button}>
+          Add Item
+        </button>
+      </div>
+
+      {/* MENU LIST */}
+      <div style={styles.card}>
+        <h3>📋 Menu Items</h3>
+
+        {items.length === 0 ? (
+          <p>No items yet</p>
+        ) : (
+          items.map((item) => (
+            <div key={item.id} style={styles.row}>
+              <span>{item.name}</span>
+              <span>₹ {item.price}</span>
+
+              <button
+                onClick={() => deleteItem(item.id)}
+                style={styles.delete}
+              >
+                Delete
+              </button>
+            </div>
+          ))
+        )}
       </div>
     </div>
   );
@@ -89,36 +153,60 @@ const styles: any = {
   container: {
     minHeight: "100vh",
     background: "#0f172a",
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  title: {
+    padding: "30px",
     color: "white",
+  },
+  header: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
     marginBottom: "20px",
+  },
+  logout: {
+    background: "red",
+    color: "white",
+    border: "none",
+    padding: "10px",
+    borderRadius: "6px",
+    cursor: "pointer",
   },
   card: {
     background: "#1e293b",
-    padding: "30px",
+    padding: "20px",
     borderRadius: "10px",
-    width: "300px",
-    display: "flex",
-    flexDirection: "column",
-    gap: "15px",
+    marginBottom: "20px",
   },
   input: {
+    display: "block",
+    marginBottom: "10px",
     padding: "10px",
     borderRadius: "6px",
     border: "none",
-    outline: "none",
+    width: "250px",
   },
   button: {
-    padding: "10px",
     background: "#22c55e",
+    color: "white",
+    padding: "10px",
     border: "none",
     borderRadius: "6px",
+    cursor: "pointer",
+  },
+  row: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginTop: "10px",
+    padding: "10px",
+    background: "#334155",
+    borderRadius: "6px",
+  },
+  delete: {
+    background: "red",
+    border: "none",
     color: "white",
+    padding: "5px 10px",
+    borderRadius: "5px",
     cursor: "pointer",
   },
 };
