@@ -1,165 +1,95 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import {
+  collection,
+  getDocs,
+  doc,
+  getDoc,
+} from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { doc, getDoc, collection, getDocs } from "firebase/firestore";
+import { useParams } from "next/navigation";
 
-export default function MenuPage({ params }: { params: { id: string } }) {
-  const [restaurant, setRestaurant] = useState<any>(null);
-  const [items, setItems] = useState<any[]>([]);
+export default function MenuPage() {
+  const { id } = useParams();
+
   const [pin, setPin] = useState("");
-  const [verified, setVerified] = useState(false);
+  const [authorized, setAuthorized] = useState(false);
+  const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // 🔥 LOAD RESTAURANT
-  useEffect(() => {
-    if (!params?.id) return;
+  // ✅ CHECK PIN
+  const checkPin = async () => {
+    const ref = doc(db, "restaurants", id as string);
+    const snap = await getDoc(ref);
 
-    const fetchRestaurant = async () => {
-      try {
-        console.log("Fetching:", params.id);
-
-        const ref = doc(db, "restaurants", params.id);
-        const snap = await getDoc(ref);
-
-        if (snap.exists()) {
-          console.log("Restaurant found:", snap.data());
-          setRestaurant(snap.data());
-        } else {
-          alert("Restaurant not found ❌");
-        }
-      } catch (err) {
-        console.error(err);
-        alert("Error loading restaurant ❌");
-      } finally {
-        setLoading(false); // ✅ IMPORTANT FIX
-      }
-    };
-
-    fetchRestaurant();
-  }, [params.id]);
-
-  // 🔥 LOAD MENU ITEMS
-  useEffect(() => {
-    if (!verified) return;
-
-    const fetchItems = async () => {
-      try {
-        const snap = await getDocs(
-          collection(db, "restaurants", params.id, "items")
-        );
-
-        const data: any[] = [];
-        snap.forEach((doc) =>
-          data.push({ id: doc.id, ...doc.data() })
-        );
-
-        setItems(data);
-      } catch (err) {
-        console.error(err);
-      }
-    };
-
-    fetchItems();
-  }, [verified, params.id]);
-
-  // 🔐 PIN CHECK
-  const handlePin = () => {
-    if (!restaurant) {
-      alert("Restaurant not loaded ❌");
+    if (!snap.exists()) {
+      alert("Restaurant not found");
       return;
     }
 
-    if (pin === restaurant.pin) {
-      setVerified(true);
+    const data = snap.data();
+
+    if (data.pin === pin) {
+      setAuthorized(true);
+      loadMenu();
     } else {
       alert("Wrong PIN ❌");
     }
   };
 
-  // 🔄 LOADING SCREEN
+  // ✅ LOAD MENU
+  const loadMenu = async () => {
+    const querySnap = await getDocs(
+      collection(db, "restaurants", id as string, "items")
+    );
+
+    const data = querySnap.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+    }));
+
+    setItems(data);
+    setLoading(false);
+  };
+
+  // 🔒 PIN SCREEN
+  if (!authorized) {
+    return (
+      <div style={{ textAlign: "center", marginTop: 200 }}>
+        <h2>Enter Table PIN</h2>
+
+        <input
+          value={pin}
+          onChange={(e) => setPin(e.target.value)}
+        />
+
+        <br />
+
+        <button onClick={checkPin}>Enter</button>
+      </div>
+    );
+  }
+
+  // ⏳ LOADING
   if (loading) {
-    return (
-      <div style={styles.center}>
-        <h2>Loading...</h2>
-      </div>
-    );
+    return <h2 style={{ textAlign: "center" }}>Loading...</h2>;
   }
 
-  // 🔐 PIN SCREEN
-  if (!verified) {
-    return (
-      <div style={styles.center}>
-        <div style={styles.card}>
-          <h3>Enter Table PIN</h3>
-          <input
-            value={pin}
-            onChange={(e) => setPin(e.target.value)}
-            placeholder="Enter PIN"
-            style={styles.input}
-          />
-          <button onClick={handlePin} style={styles.button}>
-            Enter
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  // 🍽 MENU SCREEN
+  // 🍽 MENU
   return (
-    <div style={{ padding: 20 }}>
-      <h1>{restaurant?.name} Menu</h1>
+    <div style={{ padding: 30 }}>
+      <h1>Menu</h1>
 
       {items.length === 0 ? (
-        <p>No items found</p>
+        <p>No items available</p>
       ) : (
         items.map((item) => (
-          <div key={item.id} style={styles.item}>
-            <h3>{item.name}</h3>
-            <p>₹ {item.price}</p>
+          <div key={item.id}>
+            {item.name} - ₹{item.price}
           </div>
         ))
       )}
     </div>
   );
 }
-
-// 🎨 SIMPLE STYLES
-const styles: any = {
-  center: {
-    display: "flex",
-    justifyContent: "center",
-    alignItems: "center",
-    height: "100vh",
-    background: "#0b1a2b",
-    color: "white",
-  },
-  card: {
-    background: "#13263a",
-    padding: 20,
-    borderRadius: 10,
-    textAlign: "center",
-  },
-  input: {
-    padding: 10,
-    marginTop: 10,
-    width: "100%",
-    borderRadius: 5,
-  },
-  button: {
-    marginTop: 10,
-    padding: 10,
-    background: "green",
-    color: "white",
-    border: "none",
-    borderRadius: 5,
-  },
-  item: {
-    background: "#13263a",
-    padding: 15,
-    marginTop: 10,
-    borderRadius: 8,
-    color: "white",
-  },
-};
