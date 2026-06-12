@@ -1,41 +1,57 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { collection, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import {
+  collection,
+  query,
+  where,
+  getDocs,
+} from "firebase/firestore";
 
 export default function MenuPage({ params }: any) {
   const [restaurant, setRestaurant] = useState<any>(null);
+  const [items, setItems] = useState<any[]>([]);
   const [pin, setPin] = useState("");
   const [access, setAccess] = useState(false);
-  const [loading, setLoading] = useState(true);
 
-  // 🔥 FETCH RESTAURANT
+  // 🔥 FETCH RESTAURANT (CORRECT WAY)
   useEffect(() => {
     const fetchRestaurant = async () => {
-      const snapshot = await getDocs(collection(db, "restaurants"));
+      try {
+        const q = query(
+          collection(db, "restaurants"),
+          where("restaurantId", "==", params.id)
+        );
 
-      let found: any = null;
+        const snapshot = await getDocs(q);
 
-      snapshot.forEach((doc) => {
-        const data = doc.data();
-
-        console.log("Checking:", data); // DEBUG
-
-        if (data.restaurantId === params.id) {
-          found = data;
+        if (snapshot.empty) {
+          alert("Restaurant not found ❌");
+          return;
         }
-      });
 
-      console.log("FOUND:", found); // DEBUG
+        const docData = snapshot.docs[0].data();
+        console.log("FOUND RESTAURANT:", docData);
 
-      if (!found) {
-        alert("Restaurant not found ❌");
-      } else {
-        setRestaurant(found);
+        setRestaurant(docData);
+
+        // 🔥 FETCH MENU ITEMS
+        const itemsSnap = await getDocs(collection(db, "menu"));
+        const menuItems: any[] = [];
+
+        itemsSnap.forEach((doc) => {
+          const data = doc.data();
+          if (data.restaurantId === docData.restaurantId) {
+            menuItems.push({ id: doc.id, ...data });
+          }
+        });
+
+        setItems(menuItems);
+      } catch (err) {
+        console.error(err);
+        alert("Error loading data");
       }
-
-      setLoading(false);
     };
 
     fetchRestaurant();
@@ -43,34 +59,36 @@ export default function MenuPage({ params }: any) {
 
   // 🔐 PIN CHECK
   const handlePinSubmit = () => {
-    if (!restaurant) return;
+    if (!restaurant) {
+      alert("Restaurant not loaded ❌");
+      return;
+    }
 
-    if (pin === restaurant.pin) {
+    const entered = pin.toString().trim();
+    const actual = restaurant.pin?.toString().trim();
+
+    console.log("ENTERED:", entered);
+    console.log("ACTUAL:", actual);
+
+    if (entered === actual) {
       setAccess(true);
     } else {
       alert("Wrong PIN ❌");
     }
   };
 
-  // ⏳ LOADING STATE
-  if (loading) {
-    return (
-      <div style={styles.center}>
-        <h2>Loading...</h2>
-      </div>
-    );
-  }
+  // 🎯 UI
 
-  // 🔐 PIN SCREEN
+  // 🔒 PIN SCREEN
   if (!access) {
     return (
-      <div style={styles.center}>
+      <div style={styles.container}>
         <div style={styles.card}>
           <h2>Enter Table PIN</h2>
 
           <input
-            type="text"
-            placeholder="Enter PIN"
+            type="number"
+            placeholder="Enter 4-digit PIN"
             value={pin}
             onChange={(e) => setPin(e.target.value)}
             style={styles.input}
@@ -84,53 +102,87 @@ export default function MenuPage({ params }: any) {
     );
   }
 
-  // 🍽 MENU UI (after PIN)
+  // 🍽 MENU SCREEN
   return (
     <div style={styles.container}>
-      <h1>{restaurant?.name} Menu</h1>
+      <h1 style={styles.title}>
+        {restaurant?.name || "Menu"}
+      </h1>
 
-      <p>Welcome! Menu will be shown here 👇</p>
+      {items.length === 0 ? (
+        <p>No items available</p>
+      ) : (
+        items.map((item) => (
+          <div key={item.id} style={styles.item}>
+            <div>
+              <h3>{item.name}</h3>
+              <p>₹{item.price}</p>
+            </div>
 
-      {/* NEXT STEP: fetch items from "menu" collection */}
+            <button style={styles.addBtn}>Add</button>
+          </div>
+        ))
+      )}
     </div>
   );
 }
 
 const styles: any = {
-  center: {
-    height: "100vh",
-    display: "flex",
-    justifyContent: "center",
-    alignItems: "center",
-    background: "#0f172a",
+  container: {
+    minHeight: "100vh",
+    background: "#0b1a2b",
     color: "white",
+    padding: "20px",
   },
+
   card: {
-    background: "#1e293b",
-    padding: "30px",
+    maxWidth: "300px",
+    margin: "100px auto",
+    padding: "20px",
+    background: "#1e2a38",
     borderRadius: "10px",
     textAlign: "center",
   },
+
   input: {
+    width: "100%",
     padding: "10px",
     marginTop: "10px",
-    width: "200px",
     borderRadius: "5px",
     border: "none",
   },
+
   button: {
     marginTop: "15px",
     padding: "10px 20px",
-    background: "green",
-    color: "white",
+    background: "#22c55e",
     border: "none",
     borderRadius: "5px",
+    color: "white",
     cursor: "pointer",
   },
-  container: {
-    padding: "30px",
-    background: "#0f172a",
+
+  title: {
+    textAlign: "center",
+    marginBottom: "20px",
+  },
+
+  item: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    background: "#1e2a38",
+    padding: "15px",
+    borderRadius: "10px",
+    marginBottom: "10px",
+  },
+
+  addBtn: {
+    background: "#22c55e",
+    border: "none",
+    padding: "8px 15px",
+    borderRadius: "5px",
     color: "white",
-    minHeight: "100vh",
+    cursor: "pointer",
   },
 };
