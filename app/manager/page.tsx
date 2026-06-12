@@ -17,9 +17,16 @@ export default function ManagerDashboard() {
   const [name, setName] = useState("");
   const [price, setPrice] = useState("");
 
-  // ------------------ LOAD USER ------------------
+  // ------------------ AUTH + LOAD ------------------
   useEffect(() => {
     const data = JSON.parse(localStorage.getItem("manager") || "{}");
+
+    // ❌ Not logged in
+    if (!data?.email) {
+      window.location.href = "/login";
+      return;
+    }
+
     setUser(data);
 
     if (data?.restaurantId) {
@@ -29,16 +36,20 @@ export default function ManagerDashboard() {
 
   // ------------------ FETCH MENU ------------------
   const fetchItems = async (restaurantId: string) => {
-    const snapshot = await getDocs(
-      collection(db, "restaurants", restaurantId, "menu")
-    );
+    try {
+      const snapshot = await getDocs(
+        collection(db, "restaurants", restaurantId, "menu")
+      );
 
-    const data = snapshot.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
-    }));
+      const data = snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
 
-    setItems(data);
+      setItems(data);
+    } catch (err) {
+      console.error(err);
+    }
   };
 
   // ------------------ ADD ITEM ------------------
@@ -62,6 +73,7 @@ export default function ManagerDashboard() {
 
       setName("");
       setPrice("");
+
       fetchItems(user.restaurantId);
     } catch (err) {
       console.error(err);
@@ -71,23 +83,45 @@ export default function ManagerDashboard() {
 
   // ------------------ DELETE ITEM ------------------
   const deleteItem = async (id: string) => {
-    await deleteDoc(
-      doc(db, "restaurants", user.restaurantId, "menu", id)
-    );
+    try {
+      await deleteDoc(
+        doc(db, "restaurants", user.restaurantId, "menu", id)
+      );
 
-    fetchItems(user.restaurantId);
+      fetchItems(user.restaurantId);
+    } catch (err) {
+      console.error(err);
+    }
   };
 
-  if (!user) return <p>Loading...</p>;
+  // ------------------ LOADING ------------------
+  if (!user) {
+    return <p style={{ padding: 20 }}>Loading...</p>;
+  }
 
+  // ------------------ UI ------------------
   return (
     <div style={styles.container}>
-      <h1>🍽 Manager Dashboard</h1>
+      {/* HEADER */}
+      <div style={styles.header}>
+        <div>
+          <h1>🍽 Manager Dashboard</h1>
+          <p>Email: {user.email}</p>
+          <p>Restaurant ID: {user.restaurantId}</p>
+        </div>
 
-      <p><b>Email:</b> {user.email}</p>
-      <p><b>Restaurant ID:</b> {user.restaurantId}</p>
+        <button
+          style={styles.logout}
+          onClick={() => {
+            localStorage.removeItem("manager");
+            window.location.href = "/login";
+          }}
+        >
+          Logout
+        </button>
+      </div>
 
-      {/* ------------------ ADD ITEM ------------------ */}
+      {/* ADD ITEM */}
       <div style={styles.card}>
         <h2>Add Menu Item</h2>
 
@@ -100,7 +134,7 @@ export default function ManagerDashboard() {
 
         <input
           style={styles.input}
-          placeholder="Price"
+          placeholder="Price (₹)"
           value={price}
           onChange={(e) => setPrice(e.target.value)}
         />
@@ -110,7 +144,7 @@ export default function ManagerDashboard() {
         </button>
       </div>
 
-      {/* ------------------ MENU LIST ------------------ */}
+      {/* MENU LIST */}
       <div style={styles.card}>
         <h2>📋 Menu Items</h2>
 
@@ -146,6 +180,12 @@ const styles: any = {
     color: "white",
   },
 
+  header: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+
   card: {
     background: "#1e293b",
     padding: "20px",
@@ -175,6 +215,15 @@ const styles: any = {
     background: "#ef4444",
     color: "white",
     padding: "8px",
+    border: "none",
+    borderRadius: "6px",
+    cursor: "pointer",
+  },
+
+  logout: {
+    background: "#f59e0b",
+    color: "black",
+    padding: "10px",
     border: "none",
     borderRadius: "6px",
     cursor: "pointer",
