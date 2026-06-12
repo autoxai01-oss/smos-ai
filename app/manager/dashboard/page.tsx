@@ -1,96 +1,60 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { db } from "@/lib/firebase"; 
-import {
-  collection,
-  addDoc,
-  getDocs
-} from "firebase/firestore";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { db } from "../firebase";
+import { collection, getDocs } from "firebase/firestore";
 
-export default function ManagerDashboard() {
-  const [user, setUser] = useState<any>(null);
-  const [items, setItems] = useState<any[]>([]);
+export default function ManagerLogin() {
+  const router = useRouter();
 
-  const [name, setName] = useState("");
-  const [price, setPrice] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
 
-  useEffect(() => {
-    const data = JSON.parse(localStorage.getItem("manager") || "{}");
-    setUser(data);
+  const handleLogin = async () => {
+    const snapshot = await getDocs(collection(db, "users"));
 
-    if (data?.restaurantId) {
-      fetchItems(data.restaurantId);
-    }
-  }, []);
+    let foundUser: any = null;
 
-  const fetchItems = async (restaurantId: string) => {
-    const snap = await getDocs(
-      collection(db, "restaurants", restaurantId, "menu")
-    );
+    snapshot.forEach((doc) => {
+      const data = doc.data();
 
-    const list = snap.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    }));
-
-    setItems(list);
-  };
-
-  const addItem = async () => {
-    if (!name || !price) return alert("Fill all fields");
-
-    await addDoc(
-      collection(db, "restaurants", user.restaurantId, "menu"),
-      {
-        name,
-        price,
-        createdAt: new Date()
+      if (
+        data.email === email &&
+        data.password === password &&
+        data.role === "manager"
+      ) {
+        foundUser = data;
       }
-    );
+    });
 
-    setName("");
-    setPrice("");
+    if (!foundUser) {
+      alert("❌ Invalid credentials");
+      return;
+    }
 
-    fetchItems(user.restaurantId);
+    localStorage.setItem("manager", JSON.stringify(foundUser));
+    router.push("/manager/dashboard");
   };
-
-  if (!user) return <p>Loading...</p>;
 
   return (
-    <div style={{ padding: 30 }}>
-      <h1>🍽️ Manager Panel</h1>
-      <p>{user.email}</p>
-
-      <hr />
-
-      <h2>Add Menu Item</h2>
+    <div style={{ padding: "40px", color: "white" }}>
+      <h1>🔐 Manager Login</h1>
 
       <input
-        placeholder="Item name"
-        value={name}
-        onChange={(e) => setName(e.target.value)}
+        placeholder="Email"
+        onChange={(e) => setEmail(e.target.value)}
       />
       <br /><br />
 
       <input
-        placeholder="Price"
-        value={price}
-        onChange={(e) => setPrice(e.target.value)}
+        type="password"
+        placeholder="Password"
+        onChange={(e) => setPassword(e.target.value)}
       />
       <br /><br />
 
-      <button onClick={addItem}>Add Item</button>
-
-      <hr />
-
-      <h2>Menu</h2>
-
-      {items.map((item) => (
-        <div key={item.id}>
-          {item.name} — ₹{item.price}
-        </div>
-      ))}
+      <button onClick={handleLogin}>Login</button>
     </div>
   );
 }
