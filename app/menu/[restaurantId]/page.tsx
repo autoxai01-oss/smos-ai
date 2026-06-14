@@ -13,6 +13,20 @@ import { useParams, useSearchParams } from "next/navigation";
 import { addToCart, getCart, updateQty } from "@/lib/cart";
 import CartBar from "@/components/CartBar";
 
+// ✅ TYPE DEFINITIONS (FIXES VERCEL ERROR)
+type MenuItem = {
+  id: string;
+  name: string;
+  price: number;
+};
+
+type CartItem = {
+  id: string;
+  name: string;
+  price: number;
+  qty: number;
+};
+
 export default function CustomerMenu() {
   const params = useParams();
   const searchParams = useSearchParams();
@@ -20,7 +34,7 @@ export default function CustomerMenu() {
   const restaurantId = params.restaurantId as string;
   const table = searchParams.get("table");
 
-  const [menu, setMenu] = useState<any[]>([]);
+  const [menu, setMenu] = useState<MenuItem[]>([]);
   const [enteredPin, setEnteredPin] = useState("");
   const [verified, setVerified] = useState(false);
   const [refresh, setRefresh] = useState(false); // 🔥 force UI update
@@ -64,7 +78,12 @@ export default function CustomerMenu() {
     );
 
     const unsub = onSnapshot(q, (snap) => {
-      setMenu(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      setMenu(
+        snap.docs.map((d) => ({
+          id: d.id,
+          ...(d.data() as Omit<MenuItem, "id">),
+        }))
+      );
     });
 
     return () => unsub();
@@ -97,15 +116,15 @@ export default function CustomerMenu() {
     );
   }
 
-  // 🍽 MENU
+  // 🍽 MENU UI
   return (
     <div className="min-h-screen bg-black text-white p-6 pb-24">
 
       <h1 className="text-3xl mb-6 text-center">🍽 Menu</h1>
 
-      {menu.map(item => {
-        const cart = getCart();
-        const cartItem = cart.find(i => i.id === item.id);
+      {menu.map((item) => {
+        const cart = getCart() as CartItem[];
+        const cartItem = cart.find((i: CartItem) => i.id === item.id);
 
         return (
           <div
