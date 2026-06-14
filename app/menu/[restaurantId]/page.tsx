@@ -10,7 +10,7 @@ import {
   getDocs
 } from "firebase/firestore";
 import { useParams, useSearchParams } from "next/navigation";
-import { addToCart } from "@/lib/cart";
+import { addToCart, getCart, updateQty } from "@/lib/cart";
 import CartBar from "@/components/CartBar";
 
 export default function CustomerMenu() {
@@ -23,7 +23,7 @@ export default function CustomerMenu() {
   const [menu, setMenu] = useState<any[]>([]);
   const [enteredPin, setEnteredPin] = useState("");
   const [verified, setVerified] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [refresh, setRefresh] = useState(false); // 🔥 force UI update
 
   // 🔐 VERIFY PIN
   const verifyPin = async () => {
@@ -32,39 +32,29 @@ export default function CustomerMenu() {
       return;
     }
 
-    setLoading(true);
+    const q = query(
+      collection(db, "tablePins"),
+      where("restaurantId", "==", restaurantId),
+      where("tableNumber", "==", table)
+    );
 
-    try {
-      const q = query(
-        collection(db, "tablePins"),
-        where("restaurantId", "==", restaurantId),
-        where("tableNumber", "==", table)
-      );
+    const snap = await getDocs(q);
 
-      const snap = await getDocs(q);
-
-      if (snap.empty) {
-        alert("Invalid table");
-        setLoading(false);
-        return;
-      }
-
-      const data = snap.docs[0].data();
-
-      if (data.pin === enteredPin) {
-        setVerified(true);
-      } else {
-        alert("Wrong PIN");
-      }
-    } catch (err) {
-      console.error(err);
-      alert("Something went wrong");
+    if (snap.empty) {
+      alert("Invalid table");
+      return;
     }
 
-    setLoading(false);
+    const data = snap.docs[0].data();
+
+    if (data.pin === enteredPin) {
+      setVerified(true);
+    } else {
+      alert("Wrong PIN");
+    }
   };
 
-  // 🍔 LOAD MENU AFTER VERIFIED
+  // 🍔 LOAD MENU
   useEffect(() => {
     if (!verified) return;
 
@@ -92,15 +82,14 @@ export default function CustomerMenu() {
             placeholder="Enter PIN"
             value={enteredPin}
             onChange={(e)=>setEnteredPin(e.target.value)}
-            className="w-full p-2 mb-3 bg-gray-800 rounded outline-none"
+            className="w-full p-2 mb-3 bg-gray-800 rounded"
           />
 
           <button
             onClick={verifyPin}
-            disabled={loading}
             className="w-full bg-green-500 p-2 rounded"
           >
-            {loading ? "Checking..." : "Enter Menu"}
+            Enter Menu
           </button>
 
         </div>
@@ -108,46 +97,67 @@ export default function CustomerMenu() {
     );
   }
 
-  // 🛒 ADD TO CART HANDLER
-  const handleAdd = (item: any) => {
-    addToCart({
-      id: item.id,
-      name: item.name,
-      price: item.price,
-    });
-
-    // simple feedback
-    alert(`${item.name} added`);
-  };
-
-  // 🍽 MENU UI
+  // 🍽 MENU
   return (
     <div className="min-h-screen bg-black text-white p-6 pb-24">
 
       <h1 className="text-3xl mb-6 text-center">🍽 Menu</h1>
 
-      {menu.length === 0 && (
-        <p className="text-center text-gray-400">No items available</p>
-      )}
+      {menu.map(item => {
+        const cart = getCart();
+        const cartItem = cart.find(i => i.id === item.id);
 
-      {menu.map(item => (
-        <div
-          key={item.id}
-          className="bg-gray-800 p-4 mb-3 rounded flex justify-between items-center"
-        >
-          <div>
-            <p className="text-lg">{item.name}</p>
-            <p className="text-sm text-gray-400">₹{item.price}</p>
-          </div>
-
-          <button
-            onClick={() => handleAdd(item)}
-            className="bg-green-500 px-4 py-1 rounded"
+        return (
+          <div
+            key={item.id}
+            className="bg-gray-800 p-4 mb-3 rounded flex justify-between items-center"
           >
-            Add
-          </button>
-        </div>
-      ))}
+            <div>
+              <p className="text-lg">{item.name}</p>
+              <p className="text-sm text-gray-400">₹{item.price}</p>
+            </div>
+
+            {/* 🔥 DYNAMIC BUTTON */}
+            {!cartItem ? (
+              <button
+                onClick={() => {
+                  addToCart(item);
+                  setRefresh(!refresh);
+                }}
+                className="bg-green-500 px-4 py-1 rounded"
+              >
+                Add
+              </button>
+            ) : (
+              <div className="flex items-center gap-3 bg-gray-700 px-3 py-1 rounded">
+
+                <button
+                  onClick={() => {
+                    updateQty(item.id, "dec");
+                    setRefresh(!refresh);
+                  }}
+                  className="text-lg px-2"
+                >
+                  -
+                </button>
+
+                <span>{cartItem.qty}</span>
+
+                <button
+                  onClick={() => {
+                    updateQty(item.id, "inc");
+                    setRefresh(!refresh);
+                  }}
+                  className="text-lg px-2"
+                >
+                  +
+                </button>
+
+              </div>
+            )}
+          </div>
+        );
+      })}
 
       {/* 🛒 CART BAR */}
       <CartBar restaurantId={restaurantId} />
