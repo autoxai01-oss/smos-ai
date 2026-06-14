@@ -84,7 +84,7 @@ export default function CustomerMenu() {
     return () => unsub();
   }, [verified, restaurantId]);
 
-  // 🔥 PLACE ORDER (MAIN FIX)
+  // 🔥 PLACE ORDER — saves to correct subcollection
   const placeOrder = async () => {
     const cart = getCart() as CartItem[];
 
@@ -94,8 +94,7 @@ export default function CustomerMenu() {
     }
 
     try {
-      await addDoc(collection(db, "orders"), {
-        restaurantId,
+      await addDoc(collection(db, "restaurants", restaurantId, "orders"), {
         table,
         items: cart.map((item) => ({
           name: item.name,
@@ -105,7 +104,6 @@ export default function CustomerMenu() {
         createdAt: serverTimestamp()
       });
 
-      // ✅ clear cart
       localStorage.removeItem("cart");
       setRefresh(!refresh);
 
@@ -201,7 +199,6 @@ export default function CustomerMenu() {
         );
       })}
 
-      {/* 🔥 PLACE ORDER BUTTON */}
       <div className="fixed bottom-0 left-0 w-full bg-black p-4 border-t border-gray-800">
         <button
           onClick={placeOrder}
@@ -211,7 +208,6 @@ export default function CustomerMenu() {
         </button>
       </div>
 
-      {/* CART */}
       <CartBar restaurantId={restaurantId} />
 
     </div>
