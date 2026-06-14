@@ -13,7 +13,6 @@ import {
 } from "firebase/firestore";
 import { useParams, useSearchParams } from "next/navigation";
 import { addToCart, getCart, updateQty } from "@/lib/cart";
-import CartBar from "@/components/CartBar";
 
 type MenuItem = {
   id: string;
@@ -42,11 +41,8 @@ export default function CustomerMenu() {
 
   // 🔐 VERIFY PIN
   const verifyPin = async () => {
-    if (!enteredPin) return alert("Enter PIN");
-
     const q = query(
-      collection(db, "tablePins"),
-      where("restaurantId", "==", restaurantId),
+      collection(db, "restaurants", restaurantId, "tablePins"),
       where("tableNumber", "==", table)
     );
 
@@ -68,8 +64,7 @@ export default function CustomerMenu() {
     if (!verified) return;
 
     const q = query(
-      collection(db, "menu"),
-      where("restaurantId", "==", restaurantId)
+      collection(db, "restaurants", restaurantId, "menu")
     );
 
     const unsub = onSnapshot(q, (snap) => {
@@ -84,40 +79,32 @@ export default function CustomerMenu() {
     return () => unsub();
   }, [verified, restaurantId]);
 
-  // 🔥 PLACE ORDER (MAIN FIX)
+  // 🔥 PLACE ORDER
   const placeOrder = async () => {
     const cart = getCart() as CartItem[];
 
-    if (cart.length === 0) {
-      alert("Cart is empty");
-      return;
-    }
+    if (cart.length === 0) return alert("Cart empty");
 
-    try {
-      await addDoc(collection(db, "orders"), {
-        restaurantId,
-        table,
+    await addDoc(
+      collection(db, "restaurants", restaurantId, "orders"),
+      {
+        tableId: table,
         items: cart.map((item) => ({
           name: item.name,
           qty: item.qty,
           price: item.price
         })),
+        status: "pending",
         createdAt: serverTimestamp()
-      });
+      }
+    );
 
-      // ✅ clear cart
-      localStorage.removeItem("cart");
-      setRefresh(!refresh);
+    localStorage.removeItem("cart");
+    setRefresh(!refresh);
 
-      alert("✅ Order placed successfully!");
-
-    } catch (err) {
-      console.error(err);
-      alert("Error placing order");
-    }
+    alert("✅ Order placed!");
   };
 
-  // 🔐 PIN SCREEN
   if (!verified) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-black text-white">
@@ -142,7 +129,6 @@ export default function CustomerMenu() {
     );
   }
 
-  // 🍽 MENU UI
   return (
     <div className="min-h-screen bg-black text-white p-6 pb-32">
 
@@ -153,66 +139,32 @@ export default function CustomerMenu() {
         const cartItem = cart.find((i) => i.id === item.id);
 
         return (
-          <div
-            key={item.id}
-            className="bg-gray-800 p-4 mb-3 rounded flex justify-between items-center"
-          >
+          <div key={item.id} className="bg-gray-800 p-4 mb-3 rounded flex justify-between">
             <div>
-              <p className="text-lg">{item.name}</p>
-              <p className="text-sm text-gray-400">₹{item.price}</p>
+              <p>{item.name}</p>
+              <p className="text-gray-400">₹{item.price}</p>
             </div>
 
             {!cartItem ? (
-              <button
-                onClick={() => {
-                  addToCart(item);
-                  setRefresh(!refresh);
-                }}
-                className="bg-green-500 px-4 py-1 rounded"
-              >
+              <button onClick={() => { addToCart(item); setRefresh(!refresh); }}>
                 Add
               </button>
             ) : (
-              <div className="flex items-center gap-3 bg-gray-700 px-3 py-1 rounded">
-                <button
-                  onClick={() => {
-                    updateQty(item.id, "dec");
-                    setRefresh(!refresh);
-                  }}
-                  className="text-lg px-2"
-                >
-                  -
-                </button>
-
-                <span>{cartItem.qty}</span>
-
-                <button
-                  onClick={() => {
-                    updateQty(item.id, "inc");
-                    setRefresh(!refresh);
-                  }}
-                  className="text-lg px-2"
-                >
-                  +
-                </button>
+              <div>
+                <button onClick={() => { updateQty(item.id, "dec"); setRefresh(!refresh); }}>-</button>
+                {cartItem.qty}
+                <button onClick={() => { updateQty(item.id, "inc"); setRefresh(!refresh); }}>+</button>
               </div>
             )}
           </div>
         );
       })}
 
-      {/* 🔥 PLACE ORDER BUTTON */}
-      <div className="fixed bottom-0 left-0 w-full bg-black p-4 border-t border-gray-800">
-        <button
-          onClick={placeOrder}
-          className="w-full bg-green-500 p-3 rounded-xl text-lg font-bold"
-        >
-          🚀 Place Order
+      <div className="fixed bottom-0 w-full p-4 bg-black">
+        <button onClick={placeOrder} className="w-full bg-green-500 p-3 rounded">
+          Place Order
         </button>
       </div>
-
-      {/* CART */}
-      <CartBar restaurantId={restaurantId} />
 
     </div>
   );

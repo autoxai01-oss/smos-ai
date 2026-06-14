@@ -6,21 +6,18 @@ import {
   collection,
   onSnapshot,
   query,
-  orderBy,
-  where
+  orderBy
 } from "firebase/firestore";
 import { useParams } from "next/navigation";
 
 type OrderItem = {
   name: string;
   qty: number;
-  price?: number;
 };
 
 type Order = {
   id: string;
-  table: string; // ✅ FIXED (was tableId before)
-  restaurantId: string;
+  tableId: string;
   items: OrderItem[];
   createdAt?: any;
 };
@@ -31,21 +28,19 @@ export default function Kitchen() {
 
   const [orders, setOrders] = useState<Order[]>([]);
 
-  // 🔥 REALTIME FETCH (NO GROUPING)
   useEffect(() => {
     const q = query(
-      collection(db, "orders"), // ✅ FIXED (root collection)
-      where("restaurantId", "==", restaurantId), // ✅ filter per restaurant
-      orderBy("createdAt", "desc") // latest on top
+      collection(db, "restaurants", restaurantId, "orders"),
+      orderBy("createdAt", "desc")
     );
 
     const unsub = onSnapshot(q, (snap) => {
-      const data = snap.docs.map((doc) => ({
-        id: doc.id,
-        ...(doc.data() as Omit<Order, "id">),
-      }));
-
-      setOrders(data);
+      setOrders(
+        snap.docs.map((doc) => ({
+          id: doc.id,
+          ...(doc.data() as Omit<Order, "id">),
+        }))
+      );
     });
 
     return () => unsub();
@@ -54,40 +49,25 @@ export default function Kitchen() {
   return (
     <div className="min-h-screen bg-black text-white p-6">
 
-      <h1 className="text-3xl mb-6 text-center">
+      <h1 className="text-3xl text-center mb-6">
         👨‍🍳 Kitchen Dashboard
       </h1>
 
-      {/* 🔥 EVERY ORDER = NEW CARD */}
       <div className="grid md:grid-cols-3 gap-4">
 
         {orders.map((order) => (
-          <div
-            key={order.id}
-            className="bg-gray-800 p-4 rounded-xl shadow border border-gray-700"
-          >
-            <h2 className="text-lg font-bold mb-2">
-              Table: {order.table}
+          <div key={order.id} className="bg-gray-800 p-4 rounded">
+
+            <h2 className="font-bold mb-2">
+              Table: {order.tableId}
             </h2>
 
-            <p className="text-xs text-green-400 mb-2">
-              ● New Order
-            </p>
-
-            <div className="space-y-1">
-              {order.items.map((item, i) => (
-                <p key={i}>
-                  {item.name} x {item.qty}
-                </p>
-              ))}
-            </div>
-
-            {/* optional timestamp */}
-            {order.createdAt && (
-              <p className="text-xs text-gray-500 mt-3">
-                {new Date(order.createdAt.seconds * 1000).toLocaleTimeString()}
+            {order.items.map((item, i) => (
+              <p key={i}>
+                {item.name} x {item.qty}
               </p>
-            )}
+            ))}
+
           </div>
         ))}
 
