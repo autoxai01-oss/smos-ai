@@ -13,7 +13,6 @@ import { useParams, useSearchParams } from "next/navigation";
 import { addToCart, getCart, updateQty } from "@/lib/cart";
 import CartBar from "@/components/CartBar";
 
-// ✅ TYPE DEFINITIONS (FIXES VERCEL ERROR)
 type MenuItem = {
   id: string;
   name: string;
@@ -37,14 +36,11 @@ export default function CustomerMenu() {
   const [menu, setMenu] = useState<MenuItem[]>([]);
   const [enteredPin, setEnteredPin] = useState("");
   const [verified, setVerified] = useState(false);
-  const [refresh, setRefresh] = useState(false); // 🔥 force UI update
+  const [refresh, setRefresh] = useState(false);
 
   // 🔐 VERIFY PIN
   const verifyPin = async () => {
-    if (!enteredPin) {
-      alert("Enter PIN");
-      return;
-    }
+    if (!enteredPin) return alert("Enter PIN");
 
     const q = query(
       collection(db, "tablePins"),
@@ -54,10 +50,7 @@ export default function CustomerMenu() {
 
     const snap = await getDocs(q);
 
-    if (snap.empty) {
-      alert("Invalid table");
-      return;
-    }
+    if (snap.empty) return alert("Invalid table");
 
     const data = snap.docs[0].data();
 
@@ -89,94 +82,109 @@ export default function CustomerMenu() {
     return () => unsub();
   }, [verified, restaurantId]);
 
-  // 🔐 PIN SCREEN
+  // 🔐 PIN SCREEN (CREAMY STYLE)
   if (!verified) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-black text-white">
-        <div className="bg-gray-900 p-6 rounded-xl w-80 text-center">
+      <div className="min-h-screen flex items-center justify-center bg-[#f8f5f0]">
 
-          <h1 className="text-xl mb-3">🔐 Table {table}</h1>
+        <div className="bg-white p-8 rounded-2xl w-80 text-center shadow-lg">
+
+          <h1 className="text-2xl font-semibold mb-4 text-gray-800">
+            Table {table}
+          </h1>
 
           <input
             placeholder="Enter PIN"
             value={enteredPin}
             onChange={(e)=>setEnteredPin(e.target.value)}
-            className="w-full p-2 mb-3 bg-gray-800 rounded"
+            className="w-full p-3 mb-4 border rounded-lg"
           />
 
           <button
             onClick={verifyPin}
-            className="w-full bg-green-500 p-2 rounded"
+            className="w-full bg-green-600 text-white p-3 rounded-lg hover:bg-green-700 transition"
           >
             Enter Menu
           </button>
 
         </div>
+
       </div>
     );
   }
 
-  // 🍽 MENU UI
+  // 🍽 MENU UI (PREMIUM)
   return (
-    <div className="min-h-screen bg-black text-white p-6 pb-24">
+    <div className="min-h-screen bg-[#f8f5f0] text-gray-800 p-6 pb-24">
 
-      <h1 className="text-3xl mb-6 text-center">🍽 Menu</h1>
+      <h1 className="text-3xl font-bold text-center mb-8">
+        🍽 Our Menu
+      </h1>
 
-      {menu.map((item) => {
-        const cart = getCart() as CartItem[];
-        const cartItem = cart.find((i: CartItem) => i.id === item.id);
+      <div className="space-y-4 max-w-xl mx-auto">
 
-        return (
-          <div
-            key={item.id}
-            className="bg-gray-800 p-4 mb-3 rounded flex justify-between items-center"
-          >
-            <div>
-              <p className="text-lg">{item.name}</p>
-              <p className="text-sm text-gray-400">₹{item.price}</p>
-            </div>
+        {menu.map((item) => {
+          const cart = getCart() as CartItem[];
+          const cartItem = cart.find((i: CartItem) => i.id === item.id);
 
-            {/* 🔥 DYNAMIC BUTTON */}
-            {!cartItem ? (
-              <button
-                onClick={() => {
-                  addToCart(item);
-                  setRefresh(!refresh);
-                }}
-                className="bg-green-500 px-4 py-1 rounded"
-              >
-                Add
-              </button>
-            ) : (
-              <div className="flex items-center gap-3 bg-gray-700 px-3 py-1 rounded">
-
-                <button
-                  onClick={() => {
-                    updateQty(item.id, "dec");
-                    setRefresh(!refresh);
-                  }}
-                  className="text-lg px-2"
-                >
-                  -
-                </button>
-
-                <span>{cartItem.qty}</span>
-
-                <button
-                  onClick={() => {
-                    updateQty(item.id, "inc");
-                    setRefresh(!refresh);
-                  }}
-                  className="text-lg px-2"
-                >
-                  +
-                </button>
-
+          return (
+            <div
+              key={item.id}
+              className="bg-white p-4 rounded-2xl shadow-sm flex justify-between items-center"
+            >
+              <div>
+                <p className="text-lg font-semibold">
+                  {item.name}
+                </p>
+                <p className="text-sm text-gray-500">
+                  ₹{item.price}
+                </p>
               </div>
-            )}
-          </div>
-        );
-      })}
+
+              {!cartItem ? (
+                <button
+                  onClick={() => {
+                    addToCart(item);
+                    setRefresh(!refresh);
+                  }}
+                  className="bg-green-600 text-white px-4 py-1 rounded-lg hover:bg-green-700 transition"
+                >
+                  Add
+                </button>
+              ) : (
+                <div className="flex items-center gap-3 bg-gray-100 px-3 py-1 rounded-lg">
+
+                  <button
+                    onClick={() => {
+                      updateQty(item.id, "dec");
+                      setRefresh(!refresh);
+                    }}
+                    className="text-lg px-2"
+                  >
+                    −
+                  </button>
+
+                  <span className="font-semibold">
+                    {cartItem.qty}
+                  </span>
+
+                  <button
+                    onClick={() => {
+                      updateQty(item.id, "inc");
+                      setRefresh(!refresh);
+                    }}
+                    className="text-lg px-2"
+                  >
+                    +
+                  </button>
+
+                </div>
+              )}
+            </div>
+          );
+        })}
+
+      </div>
 
       {/* 🛒 CART BAR */}
       <CartBar restaurantId={restaurantId} />
