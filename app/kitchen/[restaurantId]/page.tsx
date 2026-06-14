@@ -12,14 +12,20 @@ import {
 } from "firebase/firestore";
 import { useParams } from "next/navigation";
 
+// ✅ TYPES
+type OrderItem = {
+  id: string;
+  name: string;
+  qty: number;
+  price?: number;
+};
+
 type Order = {
   id: string;
   tableId: string;
-  items: {
-    name: string;
-    qty: number;
-  }[];
+  items: OrderItem[];
   status: string;
+  isActive: boolean;
 };
 
 export default function Kitchen() {
@@ -50,7 +56,20 @@ export default function Kitchen() {
   const updateStatus = async (id: string, status: string) => {
     await updateDoc(
       doc(db, "restaurants", restaurantId, "orders", id),
-      { status }
+      {
+        status,
+      }
+    );
+  };
+
+  // 🔥 CLOSE ORDER (VERY IMPORTANT)
+  const closeOrder = async (id: string) => {
+    await updateDoc(
+      doc(db, "restaurants", restaurantId, "orders", id),
+      {
+        status: "served",
+        isActive: false, // 🔥 THIS CLOSES THE ORDER
+      }
     );
   };
 
@@ -79,8 +98,8 @@ export default function Kitchen() {
             </p>
 
             <div className="mb-3">
-              {order.items.map((item, i) => (
-                <p key={i}>
+              {order.items.map((item, index) => (
+                <p key={index}>
                   {item.name} x {item.qty}
                 </p>
               ))}
@@ -91,14 +110,14 @@ export default function Kitchen() {
 
               <button
                 onClick={() => updateStatus(order.id, "preparing")}
-                className="bg-blue-500 px-2 py-1 rounded"
+                className="bg-blue-500 px-3 py-1 rounded"
               >
                 Start
               </button>
 
               <button
-                onClick={() => updateStatus(order.id, "served")}
-                className="bg-green-500 px-2 py-1 rounded"
+                onClick={() => closeOrder(order.id)}
+                className="bg-green-500 px-3 py-1 rounded"
               >
                 Done
               </button>
