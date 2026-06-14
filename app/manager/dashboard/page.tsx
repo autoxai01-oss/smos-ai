@@ -132,16 +132,59 @@ export default function ManagerDashboard() {
     fetchTables(restaurantId);
   };
 
+  // 🔥 RESET TABLE (MAIN FEATURE)
+  const resetTable = async (tableNumber: string) => {
+    const confirmReset = confirm(
+      `Are you sure you want to reset ${tableNumber}?\n\nThis will clear all orders and reset the table.`
+    );
+
+    if (!confirmReset) return;
+
+    try {
+      // 🔥 GET ORDERS OF THIS TABLE
+      const q = query(
+        collection(db, "restaurants", restaurantId, "orders"),
+        where("tableId", "==", tableNumber)
+      );
+
+      const snap = await getDocs(q);
+
+      // 🔥 DELETE ALL ORDERS
+      const deletePromises = snap.docs.map((d) =>
+        deleteDoc(
+          doc(db, "restaurants", restaurantId, "orders", d.id)
+        )
+      );
+
+      await Promise.all(deletePromises);
+
+      // 🔐 RESET PIN
+      await setDoc(
+        doc(db, "tablePins", restaurantId + "_" + tableNumber),
+        {
+          restaurantId,
+          tableNumber,
+          pin: ""
+        }
+      );
+
+      alert(`Table ${tableNumber} reset successfully`);
+
+    } catch (err) {
+      console.error(err);
+      alert("Error resetting table");
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-black to-gray-900 text-white p-6">
 
-      {/* HEADER */}
       <h1 className="text-4xl font-bold text-center mb-10">
         👨‍🍳 Manager Dashboard
       </h1>
 
       {/* ADD MENU */}
-      <div className="bg-gray-900 p-6 rounded-2xl mb-8 shadow-lg border border-gray-800">
+      <div className="bg-gray-900 p-6 rounded-2xl mb-8 border border-gray-800">
         <h2 className="text-xl mb-4">➕ Add Menu Item</h2>
 
         <div className="flex flex-wrap gap-3">
@@ -169,7 +212,7 @@ export default function ManagerDashboard() {
 
           <button
             onClick={addItem}
-            className="bg-green-500 hover:bg-green-600 px-5 py-3 rounded-lg"
+            className="bg-green-500 px-5 py-3 rounded-lg"
           >
             Add
           </button>
@@ -178,13 +221,8 @@ export default function ManagerDashboard() {
       </div>
 
       {/* MENU LIST */}
-      <div className="bg-gray-900 p-6 rounded-2xl mb-8 shadow-lg border border-gray-800">
-
+      <div className="bg-gray-900 p-6 rounded-2xl mb-8 border border-gray-800">
         <h2 className="text-xl mb-4">📋 Menu Items</h2>
-
-        {menu.length === 0 && (
-          <p className="text-gray-400">No items yet</p>
-        )}
 
         <div className="space-y-3">
           {menu.map(item => (
@@ -192,14 +230,7 @@ export default function ManagerDashboard() {
               key={item.id}
               className="flex justify-between items-center bg-gray-800 p-4 rounded-xl"
             >
-              <div>
-                <p className="font-semibold">
-                  {item.name} - ₹{item.price}
-                </p>
-                <p className="text-sm text-gray-400">
-                  {item.category}
-                </p>
-              </div>
+              <span>{item.name} - ₹{item.price}</span>
 
               <button
                 onClick={()=>deleteItem(item.id)}
@@ -210,11 +241,10 @@ export default function ManagerDashboard() {
             </div>
           ))}
         </div>
-
       </div>
 
       {/* TABLE MANAGEMENT */}
-      <div className="bg-gray-900 p-6 rounded-2xl shadow-lg border border-gray-800">
+      <div className="bg-gray-900 p-6 rounded-2xl border border-gray-800">
 
         <h2 className="text-xl mb-4">🔐 Tables</h2>
 
@@ -228,7 +258,7 @@ export default function ManagerDashboard() {
 
           <button
             onClick={addTable}
-            className="bg-blue-500 hover:bg-blue-600 px-4 py-2 rounded-lg"
+            className="bg-blue-500 px-4 py-2 rounded-lg"
           >
             Add Table
           </button>
@@ -252,12 +282,23 @@ export default function ManagerDashboard() {
                 className="p-2 bg-gray-700 rounded-lg w-28 text-center"
               />
 
-              <button
-                onClick={()=>deleteTable(t.id)}
-                className="bg-red-500 px-3 py-1 rounded-lg"
-              >
-                Delete
-              </button>
+              <div className="flex gap-2">
+
+                <button
+                  onClick={() => resetTable(t.tableNumber)}
+                  className="bg-yellow-500 px-3 py-1 rounded-lg"
+                >
+                  Reset
+                </button>
+
+                <button
+                  onClick={()=>deleteTable(t.id)}
+                  className="bg-red-500 px-3 py-1 rounded-lg"
+                >
+                  Delete
+                </button>
+
+              </div>
 
             </div>
           ))}
