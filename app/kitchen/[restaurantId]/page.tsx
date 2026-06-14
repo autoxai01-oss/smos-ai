@@ -6,7 +6,8 @@ import {
   collection,
   onSnapshot,
   query,
-  orderBy
+  orderBy,
+  where
 } from "firebase/firestore";
 import { useParams } from "next/navigation";
 
@@ -18,7 +19,7 @@ type OrderItem = {
 
 type Order = {
   id: string;
-  tableId: string;
+  table: string;
   items: OrderItem[];
   createdAt?: any;
   status?: string;
@@ -32,8 +33,9 @@ export default function Kitchen() {
 
   useEffect(() => {
     const q = query(
-      collection(db, "restaurants", restaurantId, "orders"), // ✅ FIXED PATH
-      orderBy("createdAt", "desc") // latest first
+      collection(db, "orders"),
+      where("restaurantId", "==", restaurantId),
+      orderBy("createdAt", "desc")
     );
 
     const unsub = onSnapshot(q, (snap) => {
@@ -55,15 +57,18 @@ export default function Kitchen() {
         👨‍🍳 Kitchen Dashboard
       </h1>
 
-      <div className="grid md:grid-cols-3 gap-4">
+      {orders.length === 0 && (
+        <p className="text-center text-gray-500 mt-20">No orders yet...</p>
+      )}
 
+      <div className="grid md:grid-cols-3 gap-4">
         {orders.map((order) => (
           <div
             key={order.id}
             className="bg-gray-800 p-4 rounded-xl border border-gray-700 shadow"
           >
             <h2 className="text-lg font-bold mb-2">
-              Table: {order.tableId}
+              Table: {order.table}
             </h2>
 
             <p className="text-xs text-green-400 mb-2">
@@ -85,7 +90,6 @@ export default function Kitchen() {
             )}
           </div>
         ))}
-
       </div>
 
     </div>
