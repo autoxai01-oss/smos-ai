@@ -17,7 +17,6 @@ type OrderItem = {
   id: string;
   name: string;
   qty: number;
-  price?: number;
 };
 
 type Order = {
@@ -26,6 +25,7 @@ type Order = {
   items: OrderItem[];
   status: string;
   isActive: boolean;
+  createdAt?: any;
 };
 
 export default function Kitchen() {
@@ -38,7 +38,7 @@ export default function Kitchen() {
   useEffect(() => {
     const q = query(
       collection(db, "restaurants", restaurantId, "orders"),
-      orderBy("createdAt", "desc")
+      orderBy("createdAt", "asc") // 🔥 IMPORTANT (timeline order)
     );
 
     const unsub = onSnapshot(q, (snap) => {
@@ -52,28 +52,17 @@ export default function Kitchen() {
     return () => unsub();
   }, [restaurantId]);
 
-  // 🔥 GROUP BY TABLE
-  const groupedOrders: Record<string, OrderItem[]> = {};
+  // 🔥 GROUP BY TABLE (NO MERGE)
+  const groupedOrders: Record<string, Order[]> = {};
 
   orders.forEach((order) => {
     if (!groupedOrders[order.tableId]) {
       groupedOrders[order.tableId] = [];
     }
-
-    order.items.forEach((item) => {
-      const existing = groupedOrders[order.tableId].find(
-        (i) => i.id === item.id
-      );
-
-      if (existing) {
-        existing.qty += item.qty;
-      } else {
-        groupedOrders[order.tableId].push({ ...item });
-      }
-    });
+    groupedOrders[order.tableId].push(order);
   });
 
-  // 🔄 STATUS UPDATE
+  // 🔄 UPDATE STATUS
   const updateStatus = async (id: string, status: string) => {
     await updateDoc(
       doc(db, "restaurants", restaurantId, "orders", id),
@@ -81,6 +70,7 @@ export default function Kitchen() {
     );
   };
 
+  // 🔥 CLOSE FULL TABLE
   const closeTable = async (tableId: string) => {
     const tableOrders = orders.filter(o => o.tableId === tableId);
 
@@ -106,28 +96,37 @@ export default function Kitchen() {
 
       <div className="grid md:grid-cols-3 gap-4">
 
-        {Object.entries(groupedOrders).map(([tableId, items]) => (
+        {Object.entries(groupedOrders).map(([tableId, tableOrders]) => (
           <div key={tableId} className="bg-gray-800 p-4 rounded">
 
-            <h2 className="text-xl mb-2">Table: {tableId}</h2>
+            <h2 className="text-xl mb-3">Table: {tableId}</h2>
 
-            <div className="mb-3">
-              {items.map((item, i) => (
-                <p key={i}>
-                  {item.name} x {item.qty}
+            {/* 🔥 TIMELINE ORDERS */}
+            {tableOrders.map((order) => (
+              <div
+                key={order.id}
+                className="mb-3 border-t border-gray-600 pt-2"
+              >
+                <p className="text-sm text-gray-400 mb-1">
+                  Order #{order.id.slice(0, 5)}
                 </p>
-              ))}
-            </div>
 
-            <div className="flex gap-2">
+                {order.items.map((item, i) => (
+                  <p key={i}>
+                    {item.name} x {item.qty}
+                  </p>
+                ))}
+              </div>
+            ))}
+
+            {/* 🔥 ACTION BUTTONS */}
+            <div className="flex gap-2 mt-3">
 
               <button
                 onClick={() => {
-                  orders
-                    .filter(o => o.tableId === tableId)
-                    .forEach(o =>
-                      updateStatus(o.id, "preparing")
-                    );
+                  tableOrders.forEach(o =>
+                    updateStatus(o.id, "preparing")
+                  );
                 }}
                 className="bg-blue-500 px-3 py-1 rounded"
               >
