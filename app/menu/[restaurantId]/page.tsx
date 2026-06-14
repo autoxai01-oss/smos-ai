@@ -7,13 +7,14 @@ import {
   query,
   where,
   onSnapshot,
-  getDocs
+  getDocs,
+  addDoc,
+  serverTimestamp
 } from "firebase/firestore";
 import { useParams, useSearchParams } from "next/navigation";
 import { addToCart, getCart, updateQty } from "@/lib/cart";
 import CartBar from "@/components/CartBar";
 
-// ✅ TYPE DEFINITIONS (FIXES VERCEL ERROR)
 type MenuItem = {
   id: string;
   name: string;
@@ -37,14 +38,11 @@ export default function CustomerMenu() {
   const [menu, setMenu] = useState<MenuItem[]>([]);
   const [enteredPin, setEnteredPin] = useState("");
   const [verified, setVerified] = useState(false);
-  const [refresh, setRefresh] = useState(false); // 🔥 force UI update
+  const [refresh, setRefresh] = useState(false);
 
   // 🔐 VERIFY PIN
   const verifyPin = async () => {
-    if (!enteredPin) {
-      alert("Enter PIN");
-      return;
-    }
+    if (!enteredPin) return alert("Enter PIN");
 
     const q = query(
       collection(db, "tablePins"),
@@ -54,10 +52,7 @@ export default function CustomerMenu() {
 
     const snap = await getDocs(q);
 
-    if (snap.empty) {
-      alert("Invalid table");
-      return;
-    }
+    if (snap.empty) return alert("Invalid table");
 
     const data = snap.docs[0].data();
 
@@ -89,18 +84,50 @@ export default function CustomerMenu() {
     return () => unsub();
   }, [verified, restaurantId]);
 
+  // 🔥 PLACE ORDER (MAIN FIX)
+  const placeOrder = async () => {
+    const cart = getCart() as CartItem[];
+
+    if (cart.length === 0) {
+      alert("Cart is empty");
+      return;
+    }
+
+    try {
+      await addDoc(collection(db, "orders"), {
+        restaurantId,
+        table,
+        items: cart.map((item) => ({
+          name: item.name,
+          qty: item.qty,
+          price: item.price
+        })),
+        createdAt: serverTimestamp()
+      });
+
+      // ✅ clear cart
+      localStorage.removeItem("cart");
+      setRefresh(!refresh);
+
+      alert("✅ Order placed successfully!");
+
+    } catch (err) {
+      console.error(err);
+      alert("Error placing order");
+    }
+  };
+
   // 🔐 PIN SCREEN
   if (!verified) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-black text-white">
         <div className="bg-gray-900 p-6 rounded-xl w-80 text-center">
-
           <h1 className="text-xl mb-3">🔐 Table {table}</h1>
 
           <input
             placeholder="Enter PIN"
             value={enteredPin}
-            onChange={(e)=>setEnteredPin(e.target.value)}
+            onChange={(e) => setEnteredPin(e.target.value)}
             className="w-full p-2 mb-3 bg-gray-800 rounded"
           />
 
@@ -110,7 +137,6 @@ export default function CustomerMenu() {
           >
             Enter Menu
           </button>
-
         </div>
       </div>
     );
@@ -118,13 +144,13 @@ export default function CustomerMenu() {
 
   // 🍽 MENU UI
   return (
-    <div className="min-h-screen bg-black text-white p-6 pb-24">
+    <div className="min-h-screen bg-black text-white p-6 pb-32">
 
       <h1 className="text-3xl mb-6 text-center">🍽 Menu</h1>
 
       {menu.map((item) => {
         const cart = getCart() as CartItem[];
-        const cartItem = cart.find((i: CartItem) => i.id === item.id);
+        const cartItem = cart.find((i) => i.id === item.id);
 
         return (
           <div
@@ -136,7 +162,6 @@ export default function CustomerMenu() {
               <p className="text-sm text-gray-400">₹{item.price}</p>
             </div>
 
-            {/* 🔥 DYNAMIC BUTTON */}
             {!cartItem ? (
               <button
                 onClick={() => {
@@ -149,7 +174,6 @@ export default function CustomerMenu() {
               </button>
             ) : (
               <div className="flex items-center gap-3 bg-gray-700 px-3 py-1 rounded">
-
                 <button
                   onClick={() => {
                     updateQty(item.id, "dec");
@@ -171,14 +195,23 @@ export default function CustomerMenu() {
                 >
                   +
                 </button>
-
               </div>
             )}
           </div>
         );
       })}
 
-      {/* 🛒 CART BAR */}
+      {/* 🔥 PLACE ORDER BUTTON */}
+      <div className="fixed bottom-0 left-0 w-full bg-black p-4 border-t border-gray-800">
+        <button
+          onClick={placeOrder}
+          className="w-full bg-green-500 p-3 rounded-xl text-lg font-bold"
+        >
+          🚀 Place Order
+        </button>
+      </div>
+
+      {/* CART */}
       <CartBar restaurantId={restaurantId} />
 
     </div>

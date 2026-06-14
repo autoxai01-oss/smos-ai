@@ -6,19 +6,21 @@ import {
   collection,
   onSnapshot,
   query,
-  orderBy
+  orderBy,
+  where
 } from "firebase/firestore";
 import { useParams } from "next/navigation";
 
 type OrderItem = {
-  id: string;
   name: string;
   qty: number;
+  price?: number;
 };
 
 type Order = {
   id: string;
-  tableId: string;
+  table: string; // ✅ FIXED (was tableId before)
+  restaurantId: string;
   items: OrderItem[];
   createdAt?: any;
 };
@@ -29,11 +31,12 @@ export default function Kitchen() {
 
   const [orders, setOrders] = useState<Order[]>([]);
 
-  // 🔥 REALTIME FETCH
+  // 🔥 REALTIME FETCH (NO GROUPING)
   useEffect(() => {
     const q = query(
-      collection(db, "restaurants", restaurantId, "orders"),
-      orderBy("createdAt", "asc")
+      collection(db, "orders"), // ✅ FIXED (root collection)
+      where("restaurantId", "==", restaurantId), // ✅ filter per restaurant
+      orderBy("createdAt", "desc") // latest on top
     );
 
     const unsub = onSnapshot(q, (snap) => {
@@ -41,21 +44,12 @@ export default function Kitchen() {
         id: doc.id,
         ...(doc.data() as Omit<Order, "id">),
       }));
+
       setOrders(data);
     });
 
     return () => unsub();
   }, [restaurantId]);
-
-  // 🔥 GROUP BY TABLE
-  const grouped: Record<string, Order[]> = {};
-
-  orders.forEach((order) => {
-    if (!grouped[order.tableId]) {
-      grouped[order.tableId] = [];
-    }
-    grouped[order.tableId].push(order);
-  });
 
   return (
     <div className="min-h-screen bg-black text-white p-6">
@@ -64,33 +58,36 @@ export default function Kitchen() {
         👨‍🍳 Kitchen Dashboard
       </h1>
 
+      {/* 🔥 EVERY ORDER = NEW CARD */}
       <div className="grid md:grid-cols-3 gap-4">
 
-        {Object.entries(grouped).map(([tableId, tableOrders]) => (
-          <div key={tableId} className="bg-gray-800 p-4 rounded">
-
-            <h2 className="text-xl mb-3">
-              Table: {tableId}
+        {orders.map((order) => (
+          <div
+            key={order.id}
+            className="bg-gray-800 p-4 rounded-xl shadow border border-gray-700"
+          >
+            <h2 className="text-lg font-bold mb-2">
+              Table: {order.table}
             </h2>
 
-            {/* 🔥 TRUE TIMELINE */}
-            {tableOrders.map((order) => (
-              <div
-                key={order.id}
-                className="mb-4 border-t border-gray-600 pt-2"
-              >
-                <p className="text-xs text-gray-400 mb-1">
-                  New Order
+            <p className="text-xs text-green-400 mb-2">
+              ● New Order
+            </p>
+
+            <div className="space-y-1">
+              {order.items.map((item, i) => (
+                <p key={i}>
+                  {item.name} x {item.qty}
                 </p>
+              ))}
+            </div>
 
-                {order.items.map((item, i) => (
-                  <p key={i}>
-                    {item.name} x {item.qty}
-                  </p>
-                ))}
-              </div>
-            ))}
-
+            {/* optional timestamp */}
+            {order.createdAt && (
+              <p className="text-xs text-gray-500 mt-3">
+                {new Date(order.createdAt.seconds * 1000).toLocaleTimeString()}
+              </p>
+            )}
           </div>
         ))}
 
