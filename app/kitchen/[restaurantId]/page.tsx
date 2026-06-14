@@ -12,7 +12,7 @@ import {
 } from "firebase/firestore";
 import { useParams } from "next/navigation";
 
-// ✅ TYPES
+// TYPES
 type OrderItem = {
   id: string;
   name: string;
@@ -34,7 +34,7 @@ export default function Kitchen() {
 
   const [orders, setOrders] = useState<Order[]>([]);
 
-  // 🔥 REAL-TIME LISTENER
+  // 🔥 REALTIME FETCH
   useEffect(() => {
     const q = query(
       collection(db, "restaurants", restaurantId, "orders"),
@@ -52,25 +52,47 @@ export default function Kitchen() {
     return () => unsub();
   }, [restaurantId]);
 
-  // 🔄 UPDATE STATUS
+  // 🔥 GROUP BY TABLE
+  const groupedOrders: Record<string, OrderItem[]> = {};
+
+  orders.forEach((order) => {
+    if (!groupedOrders[order.tableId]) {
+      groupedOrders[order.tableId] = [];
+    }
+
+    order.items.forEach((item) => {
+      const existing = groupedOrders[order.tableId].find(
+        (i) => i.id === item.id
+      );
+
+      if (existing) {
+        existing.qty += item.qty;
+      } else {
+        groupedOrders[order.tableId].push({ ...item });
+      }
+    });
+  });
+
+  // 🔄 STATUS UPDATE
   const updateStatus = async (id: string, status: string) => {
     await updateDoc(
       doc(db, "restaurants", restaurantId, "orders", id),
-      {
-        status,
-      }
+      { status }
     );
   };
 
-  // 🔥 CLOSE ORDER (VERY IMPORTANT)
-  const closeOrder = async (id: string) => {
-    await updateDoc(
-      doc(db, "restaurants", restaurantId, "orders", id),
-      {
-        status: "served",
-        isActive: false, // 🔥 THIS CLOSES THE ORDER
-      }
-    );
+  const closeTable = async (tableId: string) => {
+    const tableOrders = orders.filter(o => o.tableId === tableId);
+
+    for (const order of tableOrders) {
+      await updateDoc(
+        doc(db, "restaurants", restaurantId, "orders", order.id),
+        {
+          status: "served",
+          isActive: false,
+        }
+      );
+    }
   };
 
   return (
@@ -78,45 +100,42 @@ export default function Kitchen() {
 
       <h1 className="text-3xl mb-6 text-center">👨‍🍳 Kitchen Dashboard</h1>
 
-      {orders.length === 0 && (
+      {Object.keys(groupedOrders).length === 0 && (
         <p className="text-center text-gray-400">No orders yet</p>
       )}
 
       <div className="grid md:grid-cols-3 gap-4">
 
-        {orders.map((order) => (
-          <div
-            key={order.id}
-            className="bg-gray-800 p-4 rounded"
-          >
-            <h2 className="text-xl mb-2">
-              Table: {order.tableId}
-            </h2>
+        {Object.entries(groupedOrders).map(([tableId, items]) => (
+          <div key={tableId} className="bg-gray-800 p-4 rounded">
 
-            <p className="mb-2">
-              Status: <span className="font-bold">{order.status}</span>
-            </p>
+            <h2 className="text-xl mb-2">Table: {tableId}</h2>
 
             <div className="mb-3">
-              {order.items.map((item, index) => (
-                <p key={index}>
+              {items.map((item, i) => (
+                <p key={i}>
                   {item.name} x {item.qty}
                 </p>
               ))}
             </div>
 
-            {/* 🔥 ACTION BUTTONS */}
             <div className="flex gap-2">
 
               <button
-                onClick={() => updateStatus(order.id, "preparing")}
+                onClick={() => {
+                  orders
+                    .filter(o => o.tableId === tableId)
+                    .forEach(o =>
+                      updateStatus(o.id, "preparing")
+                    );
+                }}
                 className="bg-blue-500 px-3 py-1 rounded"
               >
                 Start
               </button>
 
               <button
-                onClick={() => closeOrder(order.id)}
+                onClick={() => closeTable(tableId)}
                 className="bg-green-500 px-3 py-1 rounded"
               >
                 Done
