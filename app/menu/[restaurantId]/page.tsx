@@ -44,6 +44,9 @@ export default function CustomerMenu() {
   const verifyPin = async () => {
     if (!enteredPin) return alert("Enter PIN");
 
+    // clear any old cart on new session
+    localStorage.removeItem("cart");
+
     const q = query(
       collection(db, "tablePins"),
       where("restaurantId", "==", restaurantId),
@@ -84,7 +87,7 @@ export default function CustomerMenu() {
     return () => unsub();
   }, [verified, restaurantId]);
 
-  // 🔥 PLACE ORDER — saves to correct subcollection
+  // 🔥 PLACE ORDER
   const placeOrder = async () => {
     const cart = getCart() as CartItem[];
 
@@ -93,14 +96,19 @@ export default function CustomerMenu() {
       return;
     }
 
+    const itemsToSend = cart.map((item) => ({
+      name: item.name,
+      qty: item.qty,
+      price: item.price
+    }));
+
+    // TEMP DEBUG
+    alert("Sending: " + JSON.stringify(itemsToSend) + " | table: " + table);
+
     try {
       await addDoc(collection(db, "restaurants", restaurantId, "orders"), {
         table,
-        items: cart.map((item) => ({
-          name: item.name,
-          qty: item.qty,
-          price: item.price
-        })),
+        items: itemsToSend,
         createdAt: serverTimestamp()
       });
 
@@ -111,7 +119,7 @@ export default function CustomerMenu() {
 
     } catch (err) {
       console.error(err);
-      alert("Error placing order");
+      alert("Error placing order: " + JSON.stringify(err));
     }
   };
 
