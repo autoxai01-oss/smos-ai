@@ -6,8 +6,7 @@ import {
   collection,
   onSnapshot,
   query,
-  orderBy,
-  where
+  orderBy
 } from "firebase/firestore";
 import { useParams } from "next/navigation";
 
@@ -33,8 +32,7 @@ export default function Kitchen() {
 
   useEffect(() => {
     const q = query(
-      collection(db, "orders"),
-      where("restaurantId", "==", restaurantId),
+      collection(db, "restaurants", restaurantId, "orders"),
       orderBy("createdAt", "desc")
     );
 
@@ -43,7 +41,6 @@ export default function Kitchen() {
         id: doc.id,
         ...(doc.data() as Omit<Order, "id">),
       }));
-
       setOrders(data);
     });
 
