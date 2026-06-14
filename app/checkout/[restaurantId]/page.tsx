@@ -7,15 +7,9 @@ import {
   collection,
   addDoc,
   serverTimestamp,
-  query,
-  where,
-  getDocs,
-  doc,
-  updateDoc,
 } from "firebase/firestore";
 import { getCart, clearCart } from "@/lib/cart";
 
-// ✅ TYPES
 type CartItem = {
   id: string;
   name: string;
@@ -39,7 +33,7 @@ export default function Checkout() {
     0
   );
 
-  // 🔥 MAIN FUNCTION (REPEAT ORDER LOGIC)
+  // 🔥 ALWAYS CREATE NEW ORDER — never merge
   const placeOrder = async () => {
     if (cart.length === 0) {
       alert("Cart is empty");
@@ -49,75 +43,23 @@ export default function Checkout() {
     setLoading(true);
 
     try {
-      const ordersRef = collection(
-        db,
-        "restaurants",
-        restaurantId,
-        "orders"
-      );
-
-      // 🔍 CHECK EXISTING ACTIVE ORDER
-      const q = query(
-        ordersRef,
-        where("tableId", "==", table),
-        where("isActive", "==", true)
-      );
-
-      const snap = await getDocs(q);
-
-      if (!snap.empty) {
-        // 🔥 UPDATE EXISTING ORDER
-        const existingOrder = snap.docs[0];
-        const existingData = existingOrder.data();
-
-        let updatedItems = [...existingData.items];
-
-        cart.forEach((newItem: CartItem) => {
-          const found = updatedItems.find(
-            (i: CartItem) => i.id === newItem.id
-          );
-
-          if (found) {
-            found.qty += newItem.qty;
-          } else {
-            updatedItems.push(newItem);
-          }
-        });
-
-        const newTotal = updatedItems.reduce(
-          (sum: number, item: CartItem) =>
-            sum + item.price * item.qty,
-          0
-        );
-
-        await updateDoc(
-          doc(
-            db,
-            "restaurants",
-            restaurantId,
-            "orders",
-            existingOrder.id
-          ),
-          {
-            items: updatedItems,
-            total: newTotal,
-          }
-        );
-
-      } else {
-        // 🆕 CREATE NEW ORDER
-        await addDoc(ordersRef, {
-          tableId: table,
-          items: cart,
+      await addDoc(
+        collection(db, "restaurants", restaurantId, "orders"),
+        {
+          table,
+          items: cart.map((item) => ({
+            name: item.name,
+            qty: item.qty,
+            price: item.price,
+          })),
           total,
           status: "pending",
-          isActive: true, // 🔥 KEY FIELD
           createdAt: serverTimestamp(),
-        });
-      }
+        }
+      );
 
       clearCart();
-      alert("Order updated successfully!");
+      alert("✅ Order placed successfully!");
 
     } catch (err) {
       console.error(err);
@@ -133,9 +75,7 @@ export default function Checkout() {
       <h1 className="text-3xl mb-6 text-center">🛒 Checkout</h1>
 
       {cart.length === 0 && (
-        <p className="text-center text-gray-400">
-          Cart is empty
-        </p>
+        <p className="text-center text-gray-400">Cart is empty</p>
       )}
 
       {cart.map((item) => (
@@ -155,7 +95,7 @@ export default function Checkout() {
         disabled={loading}
         className="w-full bg-green-500 p-3 mt-6 rounded"
       >
-        {loading ? "Processing..." : "Place / Update Order"}
+        {loading ? "Processing..." : "🚀 Place Order"}
       </button>
 
     </div>
